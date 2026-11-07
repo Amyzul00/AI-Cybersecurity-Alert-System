@@ -1,0 +1,45 @@
+import os
+import numpy as np
+import pandas as pd
+
+DATA_PATH = "traffic_data.csv"
+
+if not os.path.exists(DATA_PATH):
+    n_samples = 1000
+    
+    # Sample IP addresses for threat lookup / alert triggers
+    sample_ips = [
+        '192.168.1.105', '10.0.0.12', '172.16.0.45', 
+        '185.220.101.5', '45.33.32.156', '8.8.8.8'
+    ]
+    
+    data = {
+        # Core metadata for IP-based threat detection & logging
+        'Source IP': np.random.choice(sample_ips, size=n_samples),
+        'Destination IP': np.random.choice(sample_ips, size=n_samples),
+        
+        # Traffic features for model predictions
+        'Total Fwd Packets': np.random.randint(1, 100, n_samples),
+        'Total Backward Packets': np.random.randint(0, 100, n_samples),
+        'Total Length of Fwd Packets': np.random.uniform(10, 5000, n_samples),
+        'Fwd Packet Length Max': np.random.uniform(10, 1500, n_samples),
+        'Flow Bytes/s': np.random.uniform(100, 100000, n_samples),
+        'Flow Packets/s': np.random.uniform(1, 1000, n_samples),
+        
+        # Expanded Malware Families
+        'Label': np.random.choice(
+            ['BENIGN', 'Ransomware', 'Trojan', 'Spyware', 'Adware', 'DDoS', 'PortScan', 'Bot'],
+            size=n_samples,
+            p=[0.6, 0.05, 0.05, 0.05, 0.05, 0.1, 0.05, 0.05]
+        )
+    }
+    
+    df_gen = pd.DataFrame(data)
+    
+    # Ensure directory exists if DATA_PATH is inside a subfolder
+    dir_name = os.path.dirname(DATA_PATH)
+    if dir_name:
+        os.makedirs(dir_name, exist_ok=True)
+        
+    df_gen.to_csv(DATA_PATH, index=False)
+    print(f"[+] Successfully generated fallback synthetic dataset: {DATA_PATH}")
