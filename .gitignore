@@ -6,17 +6,29 @@ __pycache__/
 # Virtual environments
 venv/
 .venv/
+env/
 
 # Logs
 *.log
+CmDust-Result.log
+system_access.log
 
-# Secrets
+# Secrets and environment variables
 .env
 .env.*
+!.env.example
 
-# Large datasets
+# Large cybersecurity datasets
 data/raw/
 data/processed/
 
+
+# Large AI model files (optional: remove if you want to upload models)
+*.pth
+*.pt
+*.pkl
+*.joblib
+
 # Temporary files
 .DS_Store
+Thumbs.db
