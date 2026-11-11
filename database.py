@@ -1,15 +1,25 @@
+
 import sqlite3
 import datetime
 import os
 
-DB_NAME = "threat_logs.db"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_NAME = os.path.join(BASE_DIR, "threat_logs.db")
+
+
+def get_db_connection():
+    """Create a connection to the SQLite database."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    return conn
+
 
 def init_db():
-    """Initialize the SQLite database schema."""
-    conn = sqlite3.connect(DB_NAME)
+    """Initialize threat logs and user account tables."""
+    conn = get_db_connection()
     cursor = conn.cursor()
-    
-    # Create threat_logs table
+
+    # Existing table for detected threats
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS threat_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -23,40 +33,72 @@ def init_db():
             raw_features TEXT
         )
     ''')
-    
+
+    # New table for user registration and login
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            email TEXT NOT NULL UNIQUE,
+            hashed_password TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'analyst',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     conn.commit()
     conn.close()
+
     print(f"[+] Database initialized successfully: {DB_NAME}")
 
-def log_threat(src_ip, dst_ip, protocol, threat_type, severity, confidence_score, raw_features=""):
-    """
-    Thread-safe helper to record detected threats into the database.
-    """
+
+def log_threat(
+    src_ip, dst_ip, protocol, threat_type,
+    severity, confidence_score, raw_features=""
+):
+    """Record a detected threat in the database."""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
+
     try:
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            INSERT INTO threat_logs (timestamp, src_ip, dst_ip, protocol, threat_type, severity, confidence_score, raw_features)
+        conn = get_db_connection()
+
+        conn.execute('''
+            INSERT INTO threat_logs (
+                timestamp, src_ip, dst_ip, protocol,
+                threat_type, severity, confidence_score, raw_features
+            )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (timestamp, src_ip, dst_ip, protocol, threat_type, severity, float(confidence_score), str(raw_features)))
-        
+        ''', (
+            timestamp, src_ip, dst_ip, protocol,
+            threat_type, severity, float(confidence_score),
+            str(raw_features)
+        ))
+
         conn.commit()
         conn.close()
-        print(f"[ALERT LOGGED] {timestamp} | {src_ip} -> {dst_ip} | {threat_type} ({severity}) | Score: {confidence_score:.2f}")
+
+        print(
+            f"[ALERT LOGGED] {timestamp} | {src_ip} -> {dst_ip} | "
+            f"{threat_type} ({severity}) | Score: {confidence_score:.2f}"
+        )
+
     except Exception as e:
         print(f"[-] Database insertion error: {e}")
 
+
 def fetch_recent_threats(limit=50):
-    """Fetch the most recent N threat logs."""
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM threat_logs ORDER BY id DESC LIMIT ?", (limit,))
-    rows = cursor.fetchall()
-    conn.close()
-    return rows
+    """Fetch the most recent threat logs."""
+    conn = get_db_connection()
+
+    try:
+        rows = conn.execute(
+            "SELECT * FROM threat_logs ORDER BY id DESC LIMIT ?",
+            (limit,)
+        ).fetchall()
+        return rows
+    finally:
+        conn.close()
+
 
 if __name__ == "__main__":
     init_db()

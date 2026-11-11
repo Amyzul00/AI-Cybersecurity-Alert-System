@@ -23,19 +23,159 @@ from reportlab.platypus import (
     TableStyle,
 )
 import streamlit as st
+import mysql.connector
 
 # Import your backend threat detection engine functions
 import threat_detector
 
 # ==========================================
-# 1. Page Configuration & Dark Cyber Styling
+# 0. Konfigurasi Sambungan MySQL & Session
 # ==========================================
+def get_db_connection():
+    return mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="",  # Masukkan password MySQL anda jika ada
+        database="cybersecurity_db"
+    )
+
 st.set_page_config(
     page_title="Warisan Security Malware Operations - AI Threat Detection",
     page_icon="Logo.png",
     layout="wide",
 )
 
+# Inisialisasi Session State untuk Kawalan Akses Pengguna
+if 'logged_in' not in st.session_state:
+    st.session_state['logged_in'] = False
+if 'username' not in st.session_state:
+    st.session_state['username'] = ""
+if 'role' not in st.session_state:
+    st.session_state['role'] = ""
+
+# ==========================================
+# FUNGSI HANTAR E-MEL NOTIFIKASI PENDAFTARAN
+# ==========================================
+def send_welcome_email(receiver_email, username):
+    sender_email = "sendermalwaree@gmail.com"
+    app_password = "qldpqrxkfbeeqyhf"
+    smtp_server = "smtp.gmail.com"
+    port = 587
+
+    message = MIMEMultipart()
+    message["Subject"] = "🛡️ Pendaftaran Berjaya - Warisan Security Malware Operations"
+    message["From"] = sender_email
+    message["To"] = receiver_email
+
+    html_content = f"""
+      <html>
+        <body style="font-family: Arial, sans-serif; background-color: #121212; color: #ffffff; padding: 20px;">
+          <div style="max-width: 600px; margin: auto; background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #ff4b4b;">
+            <h2 style="color: #ff4b4b;">✨ Selamat Datang, {username}!</h2>
+            <p>Akaun anda untuk sistem <b>Warisan Security Malware Operations</b> telah berjaya didaftarkan.</p>
+            <p>Anda kini layak menerima amaran keselamatan automatik dan laporan analitik ancaman terus ke e-mel ini.</p>
+            <br>
+            <p style="font-size: 12px; color: #888;">Dijana secara automatik oleh Platform SOAR & AI Threat Detection UTP.</p>
+          </div>
+        </body>
+      </html>
+    """
+    message.attach(MIMEText(html_content, "html"))
+
+    try:
+        server = smtplib.SMTP(smtp_server, port)
+        server.starttls()
+        server.login(sender_email, app_password)
+        server.sendmail(sender_email, receiver_email, message.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        print(f"Gagal menghantar e-mel: {e}")
+        return False
+
+# ==========================================
+# PAPARAN 1: HALAMAN LOGIN & REGISTER (JIKA BELUM LOG MASUK)
+# ==========================================
+if not st.session_state['logged_in']:
+    st.markdown("""
+        <div style="text-align: center; padding: 30px;">
+            <h1 style="color: #ff4b4b;">🛡️ Warisan Security Malware Operations</h1>
+            <p style="color: #8a99ad; font-size: 1.1rem;">Sila Log Masuk atau Daftar Akaun untuk Mengakses Papan Pemuka AI & Notifikasi Amaran</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        tab_login, tab_register = st.tabs(["🔑 Log Masuk (Login)", "📝 Daftar Akaun (Register)"])
+
+        # --- TAB LOGIN ---
+        with tab_login:
+            st.subheader("Log Masuk Sistem")
+            login_user = st.text_input("Username", key="login_username")
+            login_pass = st.text_input("Password", type="password", key="login_password")
+            
+            if st.button("Masuk ke Dashboard", use_container_width=True):
+                if login_user and login_pass:
+                    try:
+                        conn = get_db_connection()
+                        cursor = conn.cursor(dictionary=True)
+                        cursor.execute("SELECT * FROM users WHERE username = %s AND password = %s", (login_user, login_pass))
+                        user = cursor.fetchone()
+                        cursor.close()
+                        conn.close()
+                        
+                        if user:
+                            st.session_state['logged_in'] = True
+                            st.session_state['username'] = user['username']
+                            st.session_state['role'] = user['role']
+                            st.success("Log masuk berjaya! Memuatkan dashboard...")
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("Username atau Password salah!")
+                    except Exception as e:
+                        st.error(f"Ralat pangkalan data: {e}")
+                else:
+                    st.warning("Sila isi semua ruangan.")
+
+        # --- TAB REGISTER (DENGAN E-MEL & NOTIFIKASI) ---
+        with tab_register:
+            st.subheader("Daftar Akaun Baru & Notifikasi")
+            reg_user = st.text_input("Pilih Username", key="reg_username")
+            reg_email = st.text_input("Alamat E-mel (Untuk Notifikasi)", key="reg_email")
+            reg_pass = st.text_input("Pilih Password", type="password", key="reg_password")
+            
+            if st.button("Daftar Sekarang", use_container_width=True):
+                if reg_user and reg_email and reg_pass:
+                    try:
+                        conn = get_db_connection()
+                        cursor = conn.cursor()
+                        # Masukkan username, password, email dan role ke MySQL
+                        cursor.execute(
+                            "INSERT INTO users (username, password, email, role) VALUES (%s, %s, %s, %s)", 
+                            (reg_user, reg_pass, reg_email, 'user')
+                        )
+                        conn.commit()
+                        cursor.close()
+                        conn.close()
+                        
+                        # Hantar e-mel notifikasi pendaftaran berjaya secara automatik
+                        with st.spinner("Menghantar e-mel pengesahan & notifikasi..."):
+                            send_welcome_email(reg_email, reg_user)
+                        
+                        st.success("Akaun berjaya didaftar dan e-mel notifikasi telah dihantar! Sila beralih ke tab 'Log Masuk'.")
+                    except mysql.connector.Error as err:
+                        st.error(f"Ralat pangkalan data (Username atau e-mel mungkin telah wujud): {err}")
+                else:
+                    st.warning("Sila isi semua ruangan termasuk e-mel.")
+
+    # Hentikan paparan di sini jika pengguna belum log masuk
+    st.stop()
+
+
+# ==========================================
+# PAPARAN 2: DASHBOARD UTAMA (SELEPAS BERJAYA LOGIN)
+# ==========================================
 st.markdown(
     """
     <style>
@@ -113,7 +253,6 @@ if rescan_clicked:
 # ==========================================
 @st.cache_resource
 def load_detection_engine():
-    # Initializes the backend engine components
     return True
 
 
@@ -127,10 +266,8 @@ if load_detection_engine():
 def get_backend_predictions():
     """Extracts live telemetry and inference results directly from threat_detector backend."""
     try:
-        # Fetch actual data generated from your backend inference pipeline
         lstm_raw_results = threat_detector.run_lstm_inference() if hasattr(threat_detector, "run_lstm_inference") else []
         
-        # Fallback formatting if backend returns custom objects, mapping them cleanly to DataFrame rows
         formatted_data = []
         if lstm_raw_results:
             for i, res in enumerate(lstm_raw_results):
@@ -143,7 +280,6 @@ def get_backend_predictions():
                 })
         
         if not formatted_data:
-            # Safe default dataset structure matching your dashboard schema if backend returns raw test logs
             formatted_data = [
                 {"IP": "192.168.1.34", "Status": "WARNING", "Threat": "Bot", "Confidence": 92.3, "Acc": 95.0},
                 {"IP": "192.168.1.76", "Status": "WARNING", "Threat": "Bot", "Confidence": 87.4, "Acc": 92.0},
@@ -379,7 +515,7 @@ def send_pdf_report_email(pdf_buffer, receiver_email="justmeameyzul@gmail.com"):
 
 
 # ==========================================
-# 6. Sidebar Filtering & SOAR Controls
+# 6. Sidebar Filtering, User Session & Notifikasi
 # ==========================================
 if logo_base64:
     st.sidebar.markdown(
@@ -391,6 +527,23 @@ else:
         "https://img.icons8.com/color/96/000000/cyber-security.png", width=80
     )
 
+# Maklumat Akaun Pengguna yang Sedang Log Masuk
+st.sidebar.success(f"👤 Pengguna: **{st.session_state['username']}**\n\n🔑 Peranan: **{st.session_state['role'].upper()}**")
+
+if st.sidebar.button("🚪 Log Keluar (Logout)", use_container_width=True):
+    st.session_state['logged_in'] = False
+    st.session_state['username'] = ""
+    st.session_state['role'] = ""
+    st.rerun()
+
+st.sidebar.divider()
+
+# Pusat Notifikasi Pengguna
+st.sidebar.subheader("🔔 Pusat Notifikasi & Amaran")
+st.sidebar.info("📩 Status Langganan Notifikasi: **Aktif (Peti Masuk & E-mel)**")
+st.sidebar.warning("⚠️ 2 Amaran Kritikal (DDoS/Botnet) baru dikesan untuk akaun anda.")
+
+st.sidebar.divider()
 st.sidebar.header("Filter & Controls")
 
 selected_threats = st.sidebar.multiselect(
@@ -426,9 +579,8 @@ if (
     ):
         time.sleep(1.0)
 
-    # Trigger backend SOAR integration handler
     handle_security_event(
-        f"SOAR Action Executed: Host {target_ip} isolated via firewall rule.",
+        f"SOAR Action Executed: Host {target_ip} isolated via firewall rule (User: {st.session_state['username']}).",
         is_critical=True,
     )
     st.sidebar.success(f"Successfully isolated host {target_ip}!")

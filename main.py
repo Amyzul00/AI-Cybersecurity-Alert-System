@@ -1,3 +1,4 @@
+
 import os
 import json
 import random
@@ -6,14 +7,19 @@ import logging
 import warnings
 from contextlib import asynccontextmanager
 
+import jwt
 import torch
 import torch.nn as nn
 import numpy as np
 import pandas as pd
 import joblib
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
+
+from auth import router as auth_router, SECRET_KEY, ALGORITHM
+
 
 warnings.filterwarnings('ignore')
 
@@ -21,8 +27,24 @@ warnings.filterwarnings('ignore')
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ThreatDetection")
 
+def verify_websocket_token(token: str):
+    try:
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM],
+        )
+
+        if not payload.get("sub") or not payload.get("role"):
+            return None
+
+        return payload
+
+    except jwt.InvalidTokenError:
+        return None
+
 # -------------------------------------------------------------------
-# 1. STRUKTUR MODEL DEEP LSTM (PYTORCH)
+# --- 1. DEEP LSTM MODEL STRUCTURE (PYTORCH) ---
 # -------------------------------------------------------------------
 class DeepLSTM(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, num_classes):
@@ -76,98 +98,169 @@ async def lifespan(app: FastAPI):
     # --- PROSES STARTUP ---
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_DIR = os.path.join(BASE_DIR, "data")
+  
     DATA_PATH = os.path.join(DATA_DIR, "traffic_data.csv")
     ALT_DATA_PATH = os.path.join(BASE_DIR, "cicids2017.csv")
 
-    target_features = [
-        'Total Fwd Packets',
-        'Total Backward Packets',
-        'Total Length of Fwd Packets',
-        'Fwd Packet Length Max',
-        'Flow Bytes/s',
-        'Flow Packets/s'
-    ]
+    # Load the five features saved with the trained LSTM model
+    features_path = os.path.join(BASE_DIR, "features.pkl")
+    target_features = joblib.load(features_path)
 
-    # 1. Memuatkan Scaler (.pkl)
+    # 1. Load the scaler
     scaler_path = os.path.join(BASE_DIR, 'scaler_lstm.pkl') if os.path.exists(os.path.join(BASE_DIR, 'scaler_lstm.pkl')) else os.path.join(BASE_DIR, 'scaler.pkl')
     scaler = joblib.load(scaler_path)
 
-    # 2. Memuatkan Label Encoder (.pkl)
+    # 2. Load the label encoder
     encoder_path = os.path.join(BASE_DIR, 'label_encoder.pkl') if os.path.exists(os.path.join(BASE_DIR, 'label_encoder.pkl')) else os.path.join(BASE_DIR, 'label_encoder_lstm.pkl')
     label_encoder = joblib.load(encoder_path)
 
+    
     # 3. Memuatkan Model PyTorch LSTM (.pth / .pt)
     model = DeepLSTM(len(target_features), 64, 2, len(label_encoder.classes_))
-    model_path = os.path.join(BASE_DIR, 'model_lstm.pth') if os.path.exists(os.path.join(BASE_DIR, 'model_lstm.pth')) else os.path.join(BASE_DIR, 'lstm_model.pth')
+    model_path = (
+        os.path.join(BASE_DIR, 'model_lstm.pth')
+        if os.path.exists(os.path.join(BASE_DIR, 'model_lstm.pth'))
+        else os.path.join(BASE_DIR, 'lstm_model.pth')
+    )
     model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
     model.eval()
 
-    # 4. Memuatkan Dataset / Menjanakan Dummy Dataset
+    # 1. Load the traffic dataset
     df_clean = None
-    active_data_path = DATA_PATH if os.path.exists(DATA_PATH) else (ALT_DATA_PATH if os.path.exists(ALT_DATA_PATH) else None)
+
+    active_data_path = (
+        DATA_PATH if os.path.exists(DATA_PATH)
+        else ALT_DATA_PATH if os.path.exists(ALT_DATA_PATH)
+        else None
+    )
 
     if active_data_path:
         try:
-            df_live = pd.read_csv(active_data_path, on_bad_lines='skip', engine='python')
-            df_live.columns = df_live.columns.str.strip().str.replace('"', '').str.replace("'", "")
-            
+            df_live = pd.read_csv(
+                active_data_path,
+                on_bad_lines="skip",
+                engine="python"
+            )
+
+            df_live.columns = (
+                df_live.columns.astype(str)
+                .str.strip()
+                .str.replace('"', '', regex=False)
+                .str.replace("'", '', regex=False)
+            )
+
+            # Match dataset columns to the five trained model features
             column_mapping = {}
-            for feat in target_features:
-                feat_lower = feat.lower()
-                for col in df_live.columns:
-                    if col.lower() == feat_lower:
-                        column_mapping[col] = feat
+
+            for feature in target_features:
+                for column in df_live.columns:
+                    if column.lower() == feature.lower():
+                        column_mapping[column] = feature
                         break
 
-            if len(column_mapping) > 0:
+            missing_features = [
+                feature for feature in target_features
+                if feature not in column_mapping.values()
+            ]
+
+            if missing_features:
+                logger.warning(
+                    "Dataset is missing required features: %s",
+                    missing_features
+                )
+            else:
                 df_live = df_live.rename(columns=column_mapping)
-                label_col = [c for c in df_live.columns if c.lower() == 'label']
-                cols_to_use = list(column_mapping.values()) + (label_col if label_col else [])
-                df_clean = df_live[cols_to_use].replace([np.inf, -np.inf], np.nan).dropna()
-                logger.info(f"[+] Dataset berjaya dimuatkan dari: {active_data_path}")
-        except Exception as e:
-            logger.error(f"[!] Gagal membaca dataset: {e}")
 
-    # Sekiranya tiada fail dataset ditemui, hasilkan dataset dummy
+                selected_columns = list(target_features)
+
+                label_columns = [
+                    column for column in df_live.columns
+                    if column.lower() == "label"
+                ]
+
+                if label_columns:
+                    selected_columns.append(label_columns[0])
+
+                df_clean = (
+                    df_live[selected_columns]
+                    .replace([np.inf, -np.inf], np.nan)
+                    .dropna(subset=target_features)
+                )
+
+                logger.info(
+                    "Loaded %s traffic records from %s",
+                    len(df_clean),
+                    active_data_path
+                )
+
+        except Exception:
+            logger.exception("Failed to load traffic dataset")
+
+    # 2. Create sample data only if no usable dataset was loaded
     if df_clean is None or df_clean.empty:
+        logger.warning(
+            "No usable dataset found. Generating synthetic traffic data."
+        )
+
         os.makedirs(DATA_DIR, exist_ok=True)
-        n_samples = 1000
-        data = {
-            'Total Fwd Packets': np.random.randint(1, 100, n_samples),
-            'Total Backward Packets': np.random.randint(0, 100, n_samples),
-            'Total Length of Fwd Packets': np.random.uniform(10, 5000, n_samples),
-            'Fwd Packet Length Max': np.random.uniform(10, 1500, n_samples),
-            'Flow Bytes/s': np.random.uniform(100, 100000, n_samples),
-            'Flow Packets/s': np.random.uniform(1, 1000, n_samples),
-            'Label': np.random.choice(['BENIGN', 'DDoS', 'PortScan', 'Bot'], size=n_samples, p=[0.7, 0.1, 0.1, 0.1])
-        }
-        df_clean = pd.DataFrame(data)
-        df_clean.to_csv(DATA_PATH, index=False)
-        logger.info(f"[+] Dataset dummy dibina di: {DATA_PATH}")
 
-    # Simpan sumber ML dalam memori global
-    ml_resources['scaler'] = scaler
-    ml_resources['label_encoder'] = label_encoder
-    ml_resources['model'] = model
-    ml_resources['df_clean'] = df_clean
-    ml_resources['target_features'] = target_features
+        sample_count = 1000
 
-    logger.info("[+] Berjaya memuatkan Model PyTorch LSTM dan Preprocessors (Scaler & Label Encoder).")
-    
-    # Memulakan pemancaran data latar belakang (Background Broadcast Loop)
-    asyncio.create_task(background_traffic_generator())
-    
-    yield  # Server sedia menerima permintaan
-    
-    # --- PROSES SHUTDOWN ---
-    ml_resources.clear()
-    logger.info("[+] Sumber ML berjaya dibersihkan.")
+        df_clean = pd.DataFrame({
+            "Total Fwd Packets": np.random.randint(
+                1, 100, sample_count
+            ),
+            "Total Backward Packets": np.random.randint(
+                0, 100, sample_count
+            ),
+            "Fwd Packet Length Max": np.random.uniform(
+                10, 1500, sample_count
+            ),
+            "Flow Bytes/s": np.random.uniform(
+                100, 100000, sample_count
+            ),
+            "Flow Packets/s": np.random.uniform(
+                1, 1000, sample_count
+            ),
+        })
+
+        # Do not overwrite an existing traffic dataset
+        if not os.path.exists(DATA_PATH):
+            df_clean.to_csv(DATA_PATH, index=False)
+
+    # 3. Store the loaded AI resources
+    ml_resources["scaler"] = scaler
+    ml_resources["label_encoder"] = label_encoder
+    ml_resources["model"] = model
+    ml_resources["df_clean"] = df_clean
+    ml_resources["target_features"] = target_features
+
+    logger.info("LSTM model and traffic dataset initialized.")
+
+    # 4. Start the background traffic generator
+    traffic_task = asyncio.create_task(
+        background_traffic_generator()
+    )
+
+    try:
+        yield
+    finally:
+        # Stop the background task when FastAPI shuts down
+        traffic_task.cancel()
+
+        try:
+            await traffic_task
+        except asyncio.CancelledError:
+            pass
+
+        ml_resources.clear()
+        logger.info("Threat detection resources released.")
 
 # -------------------------------------------------------------------
 # 4. INISIALISASI FASTAPI & MIDDLEWARE
 # -------------------------------------------------------------------
 app = FastAPI(title="AI Real-Time Threat Detection API", lifespan=lifespan)
-
+app.include_router(auth_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -227,14 +320,15 @@ async def background_traffic_generator():
                     "ip_address": ip,
                     "status": "CRITICAL" if is_threat else "NORMAL",
                     "threat_type": threat_name,
-                    "packet_size": round(float(raw_features[3]), 2),
-                    "flow_bytes_sec": round(float(raw_features[4]), 2),
+                    "packet_size": round(float(raw_features[2]), 2),
+"flow_bytes_sec": round(float(raw_features[3]), 2),
                     "metrics": {
-                        "total_fwd_packets": float(raw_features[0]),
-                        "total_bwd_packets": float(raw_features[1]),
-                        "fwd_packet_length_max": float(raw_features[3]),
-                        "flow_bytes_s": float(raw_features[4])
-                    },
+    "total_fwd_packets": float(raw_features[0]),
+    "total_bwd_packets": float(raw_features[1]),
+    "fwd_packet_length_max": float(raw_features[2]),
+    "flow_bytes_s": float(raw_features[3]),
+    "flow_packets_s": float(raw_features[4])
+},
                     "alert": is_threat
                 }
 
@@ -277,13 +371,16 @@ async def get_dashboard():
                     const data = JSON.parse(event.data);
                     const item = document.createElement("p");
                     
-                    if (data.status === "CRITICAL") {
-                        item.className = "alert-critical";
-                        item.innerText = `[🚨 CRITICAL] #${data.packet_id} | ${data.timestamp} | IP: ${data.ip} | Threat: ${data.threat_type} | Flow: ${data.flow_bytes_sec} B/s`;
-                    } else {
-                        item.className = "normal";
-                        item.innerText = `[✓ PASS] #${data.packet_id} | ${data.timestamp} | IP: ${data.ip} | Status: Normal (BENIGN)`;
-                    }
+if (data.status === "CRITICAL" && data.alert === true) {
+    item.className = "alert-critical";
+    item.innerText =
+        `[🚨 CRITICAL] #${data.packet_id} | ${data.timestamp} | IP: ${data.ip} | Threat: ${data.threat_type} | Flow: ${data.flow_bytes_sec} B/s`;
+} else {
+    item.className = "normal";
+    item.innerText =
+        `[✓ PASS] #${data.packet_id} | ${data.timestamp} | IP: ${data.ip} | Status: Normal (${data.threat_type || "BENIGN"})`;
+}
+
                     
                     logsDiv.appendChild(item);
                     logsDiv.scrollTop = logsDiv.scrollHeight;

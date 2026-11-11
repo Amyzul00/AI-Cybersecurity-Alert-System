@@ -1,5 +1,8 @@
-from log_integration import handle_security_event
+from alerts import trigger_alert
 
-if __name__ == "__main__":
-    print("Triggering test security event...")
-    handle_security_event("Testing email and slack integration", is_critical=True)
+# Replace with your own email address so you can check if you receive it
+test_email = "warisansecurityalerts@gmail.com"
+
+print("Triggering test alert...")
+trigger_alert(ip="192.168.1.100", threat_type="Ransomware-Trojan", user_email=test_email)
+print("Test completed!")
