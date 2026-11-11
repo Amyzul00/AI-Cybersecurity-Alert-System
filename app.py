@@ -53,7 +53,7 @@ if 'temp_email' not in st.session_state:
     st.session_state['temp_email'] = ""
 
 # ==========================================
-# CUSTOM DARK-MODE UI STYLING
+# ENTERPRISE SOC DARK-MODE STYLING
 # ==========================================
 st.markdown("""
     <style>
@@ -82,6 +82,56 @@ st.markdown("""
     .stTextInput > div > div > input:focus {
         border-color: #ff4b4b;
         box-shadow: 0 0 0 1px #ff4b4b;
+    }
+    /* Professional Sidebar Card Styling */
+    section[data-testid="stSidebar"] {
+        background-color: #070b19;
+        border-right: 1px solid #1e222d;
+    }
+    .sidebar-card {
+        background: #121624;
+        border: 1px solid #1e222d;
+        border-left: 3px solid #ff4b4b;
+        padding: 14px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+    }
+    .sidebar-alert-card {
+        background: #1a1512;
+        border: 1px solid #3d2c1d;
+        border-left: 3px solid #f59e0b;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+    }
+    .status-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        border-radius: 12px;
+        background: rgba(16, 185, 129, 0.15);
+        color: #10b981;
+        border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .role-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        border-radius: 12px;
+        background: rgba(255, 75, 75, 0.15);
+        color: #ff4b4b;
+        border: 1px solid rgba(255, 75, 75, 0.3);
+    }
+    /* Executive Header Banner Card */
+    .soc-header-card {
+        background: linear-gradient(135deg, #121624 0%, #070b19 100%);
+        border: 1px solid #1e222d;
+        border-radius: 12px;
+        padding: 25px;
+        margin-bottom: 25px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.5);
     }
     </style>
 """, unsafe_allow_html=True)
@@ -144,15 +194,11 @@ if not st.session_state['logged_in']:
 
     col1, col2, col3 = st.columns([1, 1.4, 1])
     with col2:
-        # 2FA OTP Verification Screen
         if st.session_state['otp_required']:
             st.info(f"🔒 A security verification code (OTP) has been generated for: **{st.session_state['temp_email']}**")
-            
-            # --- ON-SCREEN CLOUD BYPASS DEBUG BANNER ---
             st.warning(f"🔑 **[CLOUD BYPASS DEBUG] Your Active OTP Code is:** `{st.session_state['generated_otp']}`")
             
             st.subheader("Enter 6-Digit OTP Code")
-            
             entered_otp = st.text_input("Enter OTP Code", type="password", key="otp_input")
             
             c_otp1, c_otp2 = st.columns(2)
@@ -179,7 +225,6 @@ if not st.session_state['logged_in']:
         else:
             tab_login, tab_register = st.tabs(["🔑 Login", "📝 Register Account"])
 
-            # --- LOGIN TAB ---
             with tab_login:
                 st.subheader("System Login (2FA Security)")
                 login_user = st.text_input("Username", key="login_username")
@@ -219,7 +264,6 @@ if not st.session_state['logged_in']:
                     else:
                         st.warning("Please fill in all fields.")
 
-            # --- REGISTER TAB ---
             with tab_register:
                 st.subheader("Register New Account & Notifications")
                 reg_user = st.text_input("Choose Username", key="reg_username")
@@ -246,7 +290,6 @@ if not st.session_state['logged_in']:
                     else:
                         st.warning("Please fill in all fields including email.")
 
-    # Stop execution here if user is not logged in
     st.stop()
 
 
@@ -275,7 +318,7 @@ st.markdown(
 )
 
 # ==========================================
-# 2. Header & Action Controls
+# 2. Executive Header & Action Controls
 # ==========================================
 col_header, col_btn = st.columns([4, 1])
 
@@ -283,11 +326,11 @@ with col_header:
     if logo_base64:
         st.markdown(
             f"""
-            <div style="display: flex; align-items: center; gap: 20px;">
-                <img src="{logo_base64}" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 10px rgba(0,0,0,0.5);" alt="Logo">
+            <div class="soc-header-card" style="display: flex; align-items: center; gap: 20px;">
+                <img src="{logo_base64}" style="width: 85px; height: 85px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 12px rgba(255, 75, 75, 0.4);" alt="Logo">
                 <div>
-                    <h1 style="margin: 0; font-size: 2.2rem; color: #ffffff;">Warisan Security Malware Operations</h1>
-                    <p style="margin: 5px 0 0 0; color: #8a99ad; font-size: 1rem;">🔒 Dynamic Threat Detection, Automated Incident Analytics & SOAR</p>
+                    <h1 style="margin: 0; font-size: 2.1rem; color: #ffffff; font-weight: 700; letter-spacing: -0.5px;">Warisan Security Malware Operations</h1>
+                    <p style="margin: 6px 0 0 0; color: #94a3b8; font-size: 0.95rem; font-weight: 500;">🔒 Dynamic Threat Detection, Automated Incident Analytics & SOAR</p>
                 </div>
             </div>
             """,
@@ -301,7 +344,8 @@ with col_header:
 
 with col_btn:
     st.write(" ")
-    rescan_clicked = st.button("🔄 Refresh & Rescan")
+    st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
+    rescan_clicked = st.button("🔄 Refresh & Rescan", use_container_width=True)
 
 if rescan_clicked:
     st.cache_data.clear()
@@ -329,7 +373,6 @@ if load_detection_engine():
 
 @st.cache_data
 def get_backend_predictions():
-    """Extracts live telemetry and inference results with safe backend fallback."""
     formatted_data = []
     try:
         import threat_detector
@@ -596,11 +639,11 @@ def broadcast_pdf_report_to_all_users(pdf_buffer):
 
 
 # ==========================================
-# 6. Sidebar Filtering, User Session & Notifications
+# 6. Redesigned Professional Sidebar
 # ==========================================
 if logo_base64:
     st.sidebar.markdown(
-        f'<div style="text-align: center; margin-bottom: 15px;"><img src="{logo_base64}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b;"></div>',
+        f'<div style="text-align: center; margin-bottom: 20px;"><img src="{logo_base64}" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 12px rgba(255, 75, 75, 0.3);"></div>',
         unsafe_allow_html=True,
     )
 else:
@@ -608,25 +651,50 @@ else:
         "https://img.icons8.com/color/96/000000/cyber-security.png", width=80
     )
 
-# Logged-in User Account Info
-st.sidebar.success(f"👤 User: **{st.session_state['username']}**\n\n🔑 Role: **{st.session_state['role'].upper()}**")
+# User Session Card
+role_str = st.session_state['role'].upper()
+st.sidebar.markdown(f"""
+    <div class="sidebar-card">
+        <div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 4px; font-weight: 600;">👤 OPERATOR SESSION</div>
+        <div style="font-size: 1.1rem; font-weight: 700; color: #ffffff; margin-bottom: 8px;">{st.session_state['username']}</div>
+        <div><span class="role-badge">KEY : {role_str}</span></div>
+    </div>
+""", unsafe_allow_html=True)
 
-if st.sidebar.button("🚪 Logout", use_container_width=True):
+if st.sidebar.button("🚪 Terminate Session (Logout)", use_container_width=True):
     st.session_state['logged_in'] = False
     st.session_state['username'] = ""
     st.session_state['role'] = ""
     st.rerun()
 
-st.sidebar.divider()
+st.sidebar.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
-# User Notification Center
-st.sidebar.subheader("🔔 Notification & Alert Center")
-st.sidebar.info("📩 Notification Subscription Status: **Active (Inbox & 2FA Email)**")
-st.sidebar.warning("⚠️ 2 Critical Alerts (DDoS/Botnet) newly detected for your account.")
+# Notification Center Card
+st.sidebar.markdown("""
+    <div style="font-size: 0.95rem; font-weight: 700; color: #ffffff; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+        🔔 Notification Center
+    </div>
+""", unsafe_allow_html=True)
 
-st.sidebar.divider()
-st.sidebar.header("Filter & Controls")
+st.sidebar.markdown("""
+    <div class="sidebar-card">
+        <div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 4px; font-weight: 600;">SUBSCRIPTION STATUS</div>
+        <div style="font-size: 0.9rem; font-weight: 600; color: #e2e8f0;">Active</div>
+        <div style="margin-top: 6px;"><span class="status-badge">Inbox & 2FA Email</span></div>
+    </div>
+""", unsafe_allow_html=True)
 
+st.sidebar.markdown("""
+    <div class="sidebar-alert-card">
+        <div style="font-size: 0.8rem; font-weight: 700; color: #f59e0b; margin-bottom: 4px;">⚠️ CRITICAL INCIDENT ALERT</div>
+        <div style="font-size: 0.85rem; color: #cbd5e1;">2 Critical DDoS/Botnet vectors newly isolated for your subnet.</div>
+    </div>
+""", unsafe_allow_html=True)
+
+st.sidebar.markdown("<hr style='border-color: #1e222d; margin: 15px 0;'>", unsafe_allow_html=True)
+
+# Filter & Controls
+st.sidebar.markdown('<div style="font-size: 0.95rem; font-weight: 700; color: #ffffff; margin-bottom: 10px;">🎛️ Threat Filters</div>', unsafe_allow_html=True)
 selected_threats = st.sidebar.multiselect(
     "Select Threat Types:",
     options=df["Threat"].unique() if not df.empty else [],
@@ -635,8 +703,10 @@ selected_threats = st.sidebar.multiselect(
 
 filtered_df = df[df["Threat"].isin(selected_threats)] if not df.empty else df
 
-st.sidebar.divider()
-st.sidebar.subheader("🔴 Live Stream Simulation")
+st.sidebar.markdown("<hr style='border-color: #1e222d; margin: 15px 0;'>", unsafe_allow_html=True)
+
+# Live Stream Simulation
+st.sidebar.markdown('<div style="font-size: 0.95rem; font-weight: 700; color: #ffffff; margin-bottom: 10px;">📡 Telemetry Stream</div>', unsafe_allow_html=True)
 stream_live = st.sidebar.toggle("Enable Real-Time Packet Stream", value=False)
 
 if stream_live:
@@ -644,8 +714,10 @@ if stream_live:
     time.sleep(1.5)
     st.rerun()
 
-st.sidebar.divider()
-st.sidebar.subheader("🛡️ Incident Response (SOAR)")
+st.sidebar.markdown("<hr style='border-color: #1e222d; margin: 15px 0;'>", unsafe_allow_html=True)
+
+# Incident Response (SOAR)
+st.sidebar.markdown('<div style="font-size: 0.95rem; font-weight: 700; color: #ffffff; margin-bottom: 10px;">🛡️ SOAR Action Hub</div>', unsafe_allow_html=True)
 target_ip = st.sidebar.selectbox(
     "Select IP to Remediate:",
     options=filtered_df["IP"].unique() if not filtered_df.empty else ["N/A"],
