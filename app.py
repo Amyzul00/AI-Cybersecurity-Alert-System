@@ -301,7 +301,7 @@ def get_backend_predictions():
                     "Acc": float(random.uniform(90.0, 99.5))
                 })
     except Exception:
-        pass  # Gracefully fallback to robust mock telemetry if threat_detector is absent
+        pass
 
     if not formatted_data:
         formatted_data = [
@@ -487,52 +487,69 @@ def generate_pdf_report(dataframe):
 
 
 # ==========================================
-# 5. Gmail Dispatch Function
+# 5. Broadcast PDF Report to All Registered Users
 # ==========================================
-def send_pdf_report_email(pdf_buffer, receiver_email="justmeameyzul@gmail.com"):
+def broadcast_pdf_report_to_all_users(pdf_buffer):
     sender_email = "sendermalwaree@gmail.com"
     app_password = "qldpqrxkfbeeqyhf"
     smtp_server = "smtp.gmail.com"
     port = 587
 
-    message = MIMEMultipart()
-    message["Subject"] = "📊 Warisan Security Executive Report - PDF Incident Log"
-    message["From"] = sender_email
-    message["To"] = receiver_email
-
-    html_content = """
-      <html>
-        <body style="font-family: Arial, sans-serif; background-color: #121212; color: #ffffff; padding: 20px;">
-          <div style="max-width: 600px; margin: auto; background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #4CAF50;">
-            <h2 style="color: #4CAF50;">📋 Security Incident Executive Report</h2>
-            <p>Please find attached the latest automated <b>Warisan Security Malware Operations Executive Report</b> detailing current threat logs and risk statuses.</p>
-            <p style="font-size: 12px; color: #888;">Generated automatically by your Streamlit SOAR dashboard.</p>
-          </div>
-        </body>
-      </html>
-    """
-    message.attach(MIMEText(html_content, "html"))
-
     try:
-        pdf_attachment = MIMEApplication(
-            pdf_buffer.getvalue(), _subtype="pdf"
-        )
-        pdf_attachment.add_header(
-            "Content-Disposition",
-            "attachment",
-            filename="executive_threat_report.pdf",
-        )
-        message.attach(pdf_attachment)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT email FROM users WHERE email IS NOT NULL AND email != ''")
+        users = cursor.fetchall()
+        cursor.close()
+        conn.close()
 
-        server = smtplib.SMTP(smtp_server, port)
-        server.starttls()
-        server.login(sender_email, app_password)
-        server.sendmail(sender_email, receiver_email, message.as_string())
-        server.quit()
-        return True
+        recipient_emails = [row['email'] for row in users]
+        if not recipient_emails:
+            return 0
+
+        success_count = 0
+        for receiver_email in recipient_emails:
+            message = MIMEMultipart()
+            message["Subject"] = "📊 Warisan Security Executive Report - PDF Incident Log"
+            message["From"] = sender_email
+            message["To"] = receiver_email
+
+            html_content = f"""
+              <html>
+                <body style="font-family: Arial, sans-serif; background-color: #121212; color: #ffffff; padding: 20px;">
+                  <div style="max-width: 600px; margin: auto; background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #4CAF50;">
+                    <h2 style="color: #4CAF50;">📋 Security Incident Executive Report</h2>
+                    <p>Hello <b>{receiver_email}</b>,</p>
+                    <p>Please find attached the latest automated <b>Warisan Security Malware Operations Executive Report</b> detailing current threat logs and risk statuses.</p>
+                    <p style="font-size: 12px; color: #888;">Broadcasted automatically to all registered analysts by your Streamlit SOAR dashboard.</p>
+                  </div>
+                </body>
+              </html>
+            """
+            message.attach(MIMEText(html_content, "html"))
+
+            pdf_attachment = MIMEApplication(pdf_buffer.getvalue(), _subtype="pdf")
+            pdf_attachment.add_header(
+                "Content-Disposition",
+                "attachment",
+                filename="executive_threat_report.pdf",
+            )
+            message.attach(pdf_attachment)
+
+            try:
+                server = smtplib.SMTP(smtp_server, port)
+                server.starttls()
+                server.login(sender_email, app_password)
+                server.sendmail(sender_email, receiver_email, message.as_string())
+                server.quit()
+                success_count += 1
+            except Exception as e:
+                print(f"Failed to send to {receiver_email}: {e}")
+
+        return success_count
     except Exception as e:
-        print(f"Failed to send email: {e}")
-        return False
+        print(f"Broadcast error: {e}")
+        return 0
 
 
 # ==========================================
@@ -817,13 +834,11 @@ with col_download:
         use_container_width=True,
     )
 
-    if st.button("📧 Email PDF Report", use_container_width=True):
-        with st.spinner("Sending PDF report via Gmail..."):
-            success = send_pdf_report_email(pdf_buffer)
-            if success:
-                st.success("Email sent!")
-                st.toast(
-                    "✅ Executive PDF report emailed successfully!", icon="📧"
-                )
+    if st.button("📧 Email PDF Report to All Users", use_container_width=True):
+        with st.spinner("Broadcasting PDF report to all registered users..."):
+            sent_count = broadcast_pdf_report_to_all_users(pdf_buffer)
+            if sent_count > 0:
+                st.success(f"Successfully broadcasted report to {sent_count} registered user(s)!")
+                st.toast(f"✅ Executive PDF report emailed to {sent_count} users!", icon="📧")
             else:
-                st.error("Failed to send email.")
+                st.warning("No registered user email addresses found in the database.")
