@@ -53,7 +53,7 @@ if 'temp_email' not in st.session_state:
     st.session_state['temp_email'] = ""
 
 # ==========================================
-# ENTERPRISE SOC DARK-MODE STYLING
+# ENTERPRISE SOC & MODERN CARD STYLING
 # ==========================================
 st.markdown("""
     <style>
@@ -64,24 +64,35 @@ st.markdown("""
         background-color: #ff4b4b;
         color: white;
         font-weight: 600;
-        border-radius: 6px;
+        border-radius: 8px;
         border: none;
-        padding: 0.5rem 1rem;
+        padding: 0.6rem 1rem;
         transition: all 0.3s ease;
     }
     div.stButton > button:hover {
         background-color: #ff2b2b;
-        box-shadow: 0 4px 12px rgba(255, 75, 75, 0.4);
+        box-shadow: 0 4px 14px rgba(255, 75, 75, 0.4);
     }
     .stTextInput > div > div > input {
         background-color: #121624;
         color: #ffffff;
         border: 1px solid #2d3748;
-        border-radius: 6px;
+        border-radius: 8px;
+        padding: 10px;
     }
     .stTextInput > div > div > input:focus {
         border-color: #ff4b4b;
         box-shadow: 0 0 0 1px #ff4b4b;
+    }
+    /* Modern Floating Authentication Card */
+    .auth-card-wrapper {
+        background: #070b19;
+        border: 1px solid #1e222d;
+        border-radius: 20px;
+        padding: 35px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+        margin-top: 20px;
+        margin-bottom: 40px;
     }
     /* Professional Sidebar Card Styling */
     section[data-testid="stSidebar"] {
@@ -124,7 +135,6 @@ st.markdown("""
         color: #ff4b4b;
         border: 1px solid rgba(255, 75, 75, 0.3);
     }
-    /* Executive Header Banner Card */
     .soc-header-card {
         background: linear-gradient(135deg, #121624 0%, #070b19 100%);
         border: 1px solid #1e222d;
@@ -175,31 +185,32 @@ def send_email_notification(receiver_email, subject, html_content):
         return False
 
 # ==========================================
-# VIEW 1: LOGIN, OTP & REGISTER PAGE
+# VIEW 1: MODERN FLOATING CARD LOGIN / REGISTER
 # ==========================================
 if not st.session_state['logged_in']:
-    logo_img_html = (
-        f'<img src="{logo_base64}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 10px rgba(0,0,0,0.5); margin-bottom: 10px;" alt="Logo">'
-        if logo_base64
-        else '<span style="font-size: 2.5rem;">🛡️</span>'
-    )
+    col_l1, col_l2, col_l3 = st.columns([1, 1.3, 1])
+    with col_l2:
+        st.markdown('<div class="auth-card-wrapper">', unsafe_allow_html=True)
+        
+        # Logo & Brand Header Inside Card
+        logo_html = (
+            f'<div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px;">'
+            f'<img src="{logo_base64}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b;" alt="Logo">'
+            f'<div>'
+            f'<div style="font-weight: 700; color: #ffffff; font-size: 1.15rem;">Warisan Security</div>'
+            f'<div style="font-size: 0.85rem; color: #94a3b8;">Malware Operations & AI SOC</div>'
+            f'</div></div>'
+            if logo_base64
+            else ''
+        )
+        st.markdown(logo_html, unsafe_allow_html=True)
 
-    st.markdown(f"""
-        <div style="text-align: center; padding: 10px 20px 20px 20px;">
-            {logo_img_html}
-            <h1 style="color: #ff4b4b; font-size: 2.5rem; font-weight: 700; margin-bottom: 5px;">Warisan Security Malware Operations</h1>
-            <p style="color: #8a99ad; font-size: 1.1rem;">Please Login, Enter OTP, or Register an Account to Access the AI Dashboard</p>
-        </div>
-    """, unsafe_allow_html=True)
-
-    col1, col2, col3 = st.columns([1, 1.4, 1])
-    with col2:
         if st.session_state['otp_required']:
-            st.info(f"🔒 A security verification code (OTP) has been generated for: **{st.session_state['temp_email']}**")
-            st.warning(f"🔑 **[CLOUD BYPASS DEBUG] Your Active OTP Code is:** `{st.session_state['generated_otp']}`")
+            st.info(f"🔒 OTP sent to: **{st.session_state['temp_email']}**")
+            st.warning(f"🔑 **[CLOUD BYPASS DEBUG] Active OTP Code:** `{st.session_state['generated_otp']}`")
             
             st.subheader("Enter 6-Digit OTP Code")
-            entered_otp = st.text_input("Enter OTP Code", type="password", key="otp_input")
+            entered_otp = st.text_input("OTP Code", type="password", key="otp_input")
             
             c_otp1, c_otp2 = st.columns(2)
             with c_otp1:
@@ -212,26 +223,29 @@ if not st.session_state['logged_in']:
                         st.session_state['otp_required'] = False
                         st.session_state['generated_otp'] = ""
                         
-                        st.success("OTP verification successful! Loading dashboard...")
+                        st.success("Verified successfully! Loading dashboard...")
                         time.sleep(1)
                         st.rerun()
                     else:
-                        st.error("Incorrect OTP code. Please check the debug code shown above.")
+                        st.error("Incorrect OTP code.")
             with c_otp2:
                 if st.button("Cancel", use_container_width=True):
                     st.session_state['otp_required'] = False
                     st.rerun()
 
         else:
-            tab_login, tab_register = st.tabs(["🔑 Login", "📝 Register Account"])
+            tab_login, tab_register = st.tabs(["🔑 Log in", "📝 Create account"])
 
             with tab_login:
-                st.subheader("System Login (2FA Security)")
+                st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+                st.markdown('<h3 style="color: #ffffff; font-size: 1.5rem; margin-bottom: 5px;">Welcome back</h3>', unsafe_allow_html=True)
+                st.markdown('<p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 20px;">Enter your credentials to access the AI dashboard.</p>', unsafe_allow_html=True)
+                
                 login_user = st.text_input("Username", key="login_username")
                 login_pass = st.text_input("Password", type="password", key="login_password")
                 
                 st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-                if st.button("Proceed to OTP Verification", use_container_width=True):
+                if st.button("Log in", use_container_width=True):
                     if login_user and login_pass:
                         try:
                             conn = get_db_connection()
@@ -244,7 +258,7 @@ if not st.session_state['logged_in']:
                             if user:
                                 user_email = user['email']
                                 if not user_email:
-                                    st.error("Your account does not have a registered email address.")
+                                    st.error("Account missing registered email address.")
                                 else:
                                     otp_code = str(random.randint(100000, 999999))
                                     
@@ -254,24 +268,27 @@ if not st.session_state['logged_in']:
                                     st.session_state['temp_email'] = user_email
                                     
                                     st.session_state['otp_required'] = True
-                                    st.success("Credentials verified! OTP generated successfully.")
+                                    st.success("Credentials verified! Generating 2FA OTP...")
                                     time.sleep(0.5)
                                     st.rerun()
                             else:
-                                st.error("Incorrect Username or Password!")
+                                st.error("Incorrect username or password.")
                         except Exception as e:
                             st.error(f"Database error: {e}")
                     else:
                         st.warning("Please fill in all fields.")
 
             with tab_register:
-                st.subheader("Register New Account & Notifications")
+                st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+                st.markdown('<h3 style="color: #ffffff; font-size: 1.5rem; margin-bottom: 5px;">Create account</h3>', unsafe_allow_html=True)
+                st.markdown('<p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 20px;">Register for instant 2FA notifications and threat analytics.</p>', unsafe_allow_html=True)
+                
                 reg_user = st.text_input("Choose Username", key="reg_username")
-                reg_email = st.text_input("Email Address (For Notifications & OTP)", key="reg_email")
+                reg_email = st.text_input("Email Address", key="reg_email")
                 reg_pass = st.text_input("Choose Password", type="password", key="reg_password")
                 
                 st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-                if st.button("Register Now", use_container_width=True):
+                if st.button("Create account", use_container_width=True):
                     if reg_user and reg_email and reg_pass:
                         try:
                             conn = get_db_connection()
@@ -284,17 +301,19 @@ if not st.session_state['logged_in']:
                             cursor.close()
                             conn.close()
                             
-                            st.success("Account successfully registered! Please switch to the 'Login' tab.")
+                            st.success("Account created successfully! Switch to 'Log in' tab.")
                         except Exception as err:
                             st.error(f"Database error: {err}")
                     else:
-                        st.warning("Please fill in all fields including email.")
+                        st.warning("Please fill in all fields.")
+
+        st.markdown('</div>', unsafe_allow_html=True)
 
     st.stop()
 
 
 # ==========================================
-# VIEW 2: MAIN DASHBOARD (AFTER SUCCESSFUL LOGIN & OTP)
+# VIEW 2: MAIN DASHBOARD (AFTER SUCCESSFUL LOGIN)
 # ==========================================
 st.markdown(
     """
