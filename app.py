@@ -60,13 +60,6 @@ st.markdown("""
     .stApp {
         background-color: #0e1117;
     }
-    .auth-container {
-        background: #070b19;
-        border: 1px solid #1e222d;
-        padding: 35px;
-        border-radius: 12px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.6);
-    }
     div.stButton > button {
         background-color: #ff4b4b;
         color: white;
@@ -132,9 +125,6 @@ if not st.session_state['logged_in']:
 
     col1, col2, col3 = st.columns([1, 1.4, 1])
     with col2:
-        # Wrap in styled container
-        st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-        
         # 2FA OTP Verification Screen
         if st.session_state['otp_required']:
             st.info(f"🔒 A security verification code (OTP) has been generated for: **{st.session_state['temp_email']}**")
@@ -236,8 +226,6 @@ if not st.session_state['logged_in']:
                             st.error(f"Database error: {err}")
                     else:
                         st.warning("Please fill in all fields including email.")
-
-        st.markdown('</div>', unsafe_allow_html=True)
 
     # Stop execution here if user is not logged in
     st.stop()
