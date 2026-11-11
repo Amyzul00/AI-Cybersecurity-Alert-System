@@ -196,8 +196,8 @@ if not st.session_state['logged_in']:
                         try:
                             conn = get_db_connection()
                             cursor = conn.cursor()
-                            cursor.execute(
-                                "INSERT INTO users (username, password, email, role) VALUES (%s, %s, %s, %s)", 
+  cursor.execute(
+                                "INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, ?)",
                                 (reg_user, reg_pass, reg_email, 'user')
                             )
                             conn.commit()
@@ -223,7 +223,7 @@ if not st.session_state['logged_in']:
                                 send_email_notification(reg_email, welcome_subject, welcome_body)
                             
                             st.success("Account successfully registered and notification email sent! Please switch to the 'Login' tab.")
-                        except mysql.connector.Error as err:
+                        except Exception as err:
                             # Professional Error Handling for Duplicates (Error 1062)
                             if err.errno == 1062:
                                 error_msg = str(err).lower()
