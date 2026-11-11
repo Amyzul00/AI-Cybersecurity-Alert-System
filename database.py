@@ -14,7 +14,7 @@ def get_db_connection():
 
 
 def init_db():
-    """Initialize threat logs and user account tables with automatic schema migration."""
+    """Initialize threat logs and user account tables."""
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -33,9 +33,12 @@ def init_db():
         )
     ''')
 
-    # Ensure users table exists
+    # Drop old users table to ensure a clean schema with the 'password' column
+    cursor.execute("DROP TABLE IF EXISTS users")
+
+    # Fresh table for user registration and login using 'password'
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
+        CREATE TABLE users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE,
             email TEXT NOT NULL UNIQUE,
@@ -44,25 +47,6 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-
-    # Check columns and add 'password' if missing from older schema
-    cursor.execute("PRAGMA table_info(users)")
-    columns = [col[1] for col in cursor.fetchall()]
-    if "password" not in columns:
-        try:
-            cursor.execute("ALTER TABLE users ADD COLUMN password TEXT NOT NULL DEFAULT ''")
-        except Exception:
-            cursor.execute("DROP TABLE IF EXISTS users")
-            cursor.execute('''
-                CREATE TABLE users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username TEXT NOT NULL UNIQUE,
-                    email TEXT NOT NULL UNIQUE,
-                    password TEXT NOT NULL,
-                    role TEXT NOT NULL DEFAULT 'analyst',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
 
     conn.commit()
     conn.close()
