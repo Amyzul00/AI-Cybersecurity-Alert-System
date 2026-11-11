@@ -93,7 +93,11 @@ if not st.session_state['logged_in']:
     with col2:
         # 2FA OTP Verification Screen
         if st.session_state['otp_required']:
-            st.info(f"🔒 A security verification code (OTP) has been sent to your email: **{st.session_state['temp_email']}**")
+            st.info(f"🔒 A security verification code (OTP) has been generated for: **{st.session_state['temp_email']}**")
+            
+            # --- ON-SCREEN CLOUD BYPASS DEBUG BANNER ---
+            st.warning(f"🔑 **[CLOUD BYPASS DEBUG] Your Active OTP Code is:** `{st.session_state['generated_otp']}`")
+            
             st.subheader("Enter 6-Digit OTP Code")
             
             entered_otp = st.text_input("Enter OTP Code", type="password", key="otp_input")
@@ -113,7 +117,7 @@ if not st.session_state['logged_in']:
                         time.sleep(1)
                         st.rerun()
                     else:
-                        st.error("Incorrect OTP code. Please check your email.")
+                        st.error("Incorrect OTP code. Please check the debug code shown above.")
             with c_otp2:
                 if st.button("Cancel", use_container_width=True):
                     st.session_state['otp_required'] = False
@@ -141,7 +145,7 @@ if not st.session_state['logged_in']:
                             if user:
                                 user_email = user['email']
                                 if not user_email:
-                                    st.error("Your account does not have a registered email address for OTP delivery.")
+                                    st.error("Your account does not have a registered email address.")
                                 else:
                                     otp_code = str(random.randint(100000, 999999))
                                     
@@ -150,33 +154,10 @@ if not st.session_state['logged_in']:
                                     st.session_state['temp_role'] = user['role'] if 'role' in user else 'user'
                                     st.session_state['temp_email'] = user_email
                                     
-                                    subject = "🔐 Login Verification OTP - Warisan Security Malware Operations"
-                                    html_body = f"""
-                                      <html>
-                                        <body style="font-family: Arial, sans-serif; background-color: #121212; color: #ffffff; padding: 20px;">
-                                          <div style="max-width: 600px; margin: auto; background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #ff4b4b;">
-                                            <h2 style="color: #ff4b4b;">2FA Login Verification</h2>
-                                            <p>Hello <b>{user['username']}</b>,</p>
-                                            <p>Your verification code (OTP) to access the system is:</p>
-                                            <h1 style="color: #4CAF50; letter-spacing: 5px;">{otp_code}</h1>
-                                            <p>Please enter this code in the application interface to proceed.</p>
-                                            <br>
-                                            <p style="font-size: 12px; color: #888;">If you did not request this code, please ignore this email.</p>
-                                          </div>
-                                        </body>
-                                      </html>
-                                    """
-                                    
-                                    with st.spinner("Sending OTP code to your email..."):
-                                        email_sent = send_email_notification(user_email, subject, html_body)
-                                    
-                                    if email_sent:
-                                        st.session_state['otp_required'] = True
-                                        st.success("Password verified! Please check your email for the OTP code.")
-                                        time.sleep(1)
-                                        st.rerun()
-                                    else:
-                                        st.error("Failed to send OTP email. Please check internet connection or SMTP settings.")
+                                    st.session_state['otp_required'] = True
+                                    st.success("Credentials verified! OTP generated successfully.")
+                                    time.sleep(0.5)
+                                    st.rerun()
                             else:
                                 st.error("Incorrect Username or Password!")
                         except Exception as e:
@@ -204,25 +185,7 @@ if not st.session_state['logged_in']:
                             cursor.close()
                             conn.close()
                             
-                            welcome_subject = "🛡️ Registration Successful - Warisan Security Malware Operations"
-                            welcome_body = f"""
-                              <html>
-                                <body style="font-family: Arial, sans-serif; background-color: #121212; color: #ffffff; padding: 20px;">
-                                  <div style="max-width: 600px; margin: auto; background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #ff4b4b;">
-                                    <h2 style="color: #ff4b4b;">✨ Welcome, {reg_user}!</h2>
-                                    <p>Your account for the <b>Warisan Security Malware Operations</b> system has been successfully registered.</p>
-                                    <p>You can now log in using email OTP authentication to access the threat dashboard.</p>
-                                    <br>
-                                    <p style="font-size: 12px; color: #888;">Generated automatically by UTP SOAR & AI Threat Detection Platform.</p>
-                                  </div>
-                                </body>
-                              </html>
-                            """
-                            
-                            with st.spinner("Sending registration confirmation email..."):
-                                send_email_notification(reg_email, welcome_subject, welcome_body)
-                            
-                            st.success("Account successfully registered and notification email sent! Please switch to the 'Login' tab.")
+                            st.success("Account successfully registered! Please switch to the 'Login' tab.")
                         except Exception as err:
                             st.error(f"Database error: {err}")
                     else:
