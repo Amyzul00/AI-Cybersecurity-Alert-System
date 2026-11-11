@@ -53,6 +53,47 @@ if 'temp_email' not in st.session_state:
     st.session_state['temp_email'] = ""
 
 # ==========================================
+# CUSTOM DARK-MODE UI STYLING
+# ==========================================
+st.markdown("""
+    <style>
+    .stApp {
+        background-color: #0e1117;
+    }
+    .auth-container {
+        background: #070b19;
+        border: 1px solid #1e222d;
+        padding: 35px;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+    }
+    div.stButton > button {
+        background-color: #ff4b4b;
+        color: white;
+        font-weight: 600;
+        border-radius: 6px;
+        border: none;
+        padding: 0.5rem 1rem;
+        transition: all 0.3s ease;
+    }
+    div.stButton > button:hover {
+        background-color: #ff2b2b;
+        box-shadow: 0 4px 12px rgba(255, 75, 75, 0.4);
+    }
+    .stTextInput > div > div > input {
+        background-color: #121624;
+        color: #ffffff;
+        border: 1px solid #2d3748;
+        border-radius: 6px;
+    }
+    .stTextInput > div > div > input:focus {
+        border-color: #ff4b4b;
+        box-shadow: 0 0 0 1px #ff4b4b;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# ==========================================
 # EMAIL NOTIFICATION FUNCTIONS (WELCOME & OTP 2FA)
 # ==========================================
 def send_email_notification(receiver_email, subject, html_content):
@@ -83,14 +124,17 @@ def send_email_notification(receiver_email, subject, html_content):
 # ==========================================
 if not st.session_state['logged_in']:
     st.markdown("""
-        <div style="text-align: center; padding: 20px;">
-            <h1 style="color: #ff4b4b;">🛡️ Warisan Security Malware Operations</h1>
+        <div style="text-align: center; padding: 10px 20px 20px 20px;">
+            <h1 style="color: #ff4b4b; font-size: 2.5rem; font-weight: 700; margin-bottom: 5px;">🛡️ Warisan Security Malware Operations</h1>
             <p style="color: #8a99ad; font-size: 1.1rem;">Please Login, Enter OTP, or Register an Account to Access the AI Dashboard</p>
         </div>
     """, unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col1, col2, col3 = st.columns([1, 1.4, 1])
     with col2:
+        # Wrap in styled container
+        st.markdown('<div class="auth-container">', unsafe_allow_html=True)
+        
         # 2FA OTP Verification Screen
         if st.session_state['otp_required']:
             st.info(f"🔒 A security verification code (OTP) has been generated for: **{st.session_state['temp_email']}**")
@@ -132,6 +176,7 @@ if not st.session_state['logged_in']:
                 login_user = st.text_input("Username", key="login_username")
                 login_pass = st.text_input("Password", type="password", key="login_password")
                 
+                st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
                 if st.button("Proceed to OTP Verification", use_container_width=True):
                     if login_user and login_pass:
                         try:
@@ -172,6 +217,7 @@ if not st.session_state['logged_in']:
                 reg_email = st.text_input("Email Address (For Notifications & OTP)", key="reg_email")
                 reg_pass = st.text_input("Choose Password", type="password", key="reg_password")
                 
+                st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
                 if st.button("Register Now", use_container_width=True):
                     if reg_user and reg_email and reg_pass:
                         try:
@@ -190,6 +236,8 @@ if not st.session_state['logged_in']:
                             st.error(f"Database error: {err}")
                     else:
                         st.warning("Please fill in all fields including email.")
+
+        st.markdown('</div>', unsafe_allow_html=True)
 
     # Stop execution here if user is not logged in
     st.stop()
