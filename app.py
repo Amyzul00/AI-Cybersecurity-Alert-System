@@ -104,31 +104,28 @@ st.markdown("""
         box-shadow: 0 0 0 1px #ff4b4b !important;
     }
     
-    /* Sidebar Enterprise Styling */
+    /* Sidebar Enterprise Styling matching screenshots */
     section[data-testid="stSidebar"] {
-        background-color: #0c101d;
+        background-color: #121212;
         border-right: 1px solid #1e222d;
     }
     .sidebar-user-card {
-        background: linear-gradient(135deg, #121624 0%, #0d2318 100%);
+        background: #0d2318;
         border: 1px solid #1a3a2a;
         padding: 16px;
         border-radius: 12px;
         margin-bottom: 15px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
     }
     .sidebar-notif-card {
-        background: #121624;
-        border: 1px solid #1e222d;
-        border-left: 3px solid #3b82f6;
+        background: #171d29;
+        border: 1px solid #222b3c;
         padding: 14px;
         border-radius: 10px;
         margin-bottom: 12px;
     }
     .sidebar-alert-card {
-        background: #1a1512;
-        border: 1px solid #3d2c1d;
-        border-left: 3px solid #f59e0b;
+        background: #241d13;
+        border: 1px solid #3c2e1b;
         padding: 14px;
         border-radius: 10px;
         margin-bottom: 15px;
@@ -625,7 +622,7 @@ def broadcast_pdf_report_to_all_users(pdf_buffer):
 
 
 # ==========================================
-# Professional Sidebar
+# Restored Professional Sidebar
 # ==========================================
 if logo_base64:
     st.sidebar.markdown(
@@ -638,10 +635,10 @@ else:
 role_str = st.session_state['role'].upper()
 st.sidebar.markdown(f"""
     <div class="sidebar-user-card">
-        <div style="font-size: 0.95rem; font-weight: 700; color: #4ade80; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
+        <div style="font-size: 1.05rem; font-weight: 700; color: #4ade80; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
             👤 User: <span style="color: #ffffff;">{st.session_state['username']}</span>
         </div>
-        <div style="font-size: 0.9rem; font-weight: 700; color: #facc15; display: flex; align-items: center; gap: 8px;">
+        <div style="font-size: 0.95rem; font-weight: 700; color: #facc15; display: flex; align-items: center; gap: 8px;">
             🔑 Role: <span style="color: #ffffff;">{role_str}</span>
         </div>
     </div>
@@ -653,33 +650,34 @@ if st.sidebar.button("🚪 Logout", use_container_width=True):
     st.session_state['role'] = ""
     st.rerun()
 
-st.sidebar.markdown("<hr style='border-color: #1e222d; margin: 18px 0;'>", unsafe_allow_html=True)
+st.sidebar.markdown("<hr style='border-color: #1e222d; margin: 20px 0;'>", unsafe_allow_html=True)
 
 st.sidebar.markdown("""
-    <div style="font-size: 1rem; font-weight: 700; color: #ffffff; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+    <div style="font-size: 1.05rem; font-weight: 700; color: #ffffff; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
         🔔 Notification & Alert Center
     </div>
 """, unsafe_allow_html=True)
 
 st.sidebar.markdown("""
     <div class="sidebar-notif-card">
-        <div style="font-size: 0.85rem; font-weight: 600; color: #93c5fd; line-height: 1.4;">
-            📥 Subscription: <span style="color: #ffffff;">Active (Inbox & 2FA Email)</span>
+        <div style="font-size: 0.9rem; font-weight: 600; color: #93c5fd; line-height: 1.4;">
+            📥 Notification Subscription Status: <span style="color: #ffffff;">Active (Inbox & 2FA Email)</span>
         </div>
     </div>
 """, unsafe_allow_html=True)
 
 st.sidebar.markdown("""
     <div class="sidebar-alert-card">
-        <div style="font-size: 0.85rem; font-weight: 600; color: #facc15; line-height: 1.4;">
-            ⚠️ 2 Critical Alerts (DDoS/Botnet) newly detected for your subnet.
+        <div style="font-size: 0.9rem; font-weight: 600; color: #facc15; line-height: 1.4;">
+            ⚠️ 2 Critical Alerts (DDoS/Botnet) newly detected for your account.
         </div>
     </div>
 """, unsafe_allow_html=True)
 
-st.sidebar.markdown("<hr style='border-color: #1e222d; margin: 18px 0;'>", unsafe_allow_html=True)
+st.sidebar.markdown("<hr style='border-color: #1e222d; margin: 20px 0;'>", unsafe_allow_html=True)
 
-st.sidebar.markdown('<div style="font-size: 1rem; font-weight: 700; color: #ffffff; margin-bottom: 8px;">🎛️ Filter & Controls</div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div style="font-size: 1.1rem; font-weight: 700; color: #ffffff; margin-bottom: 10px;">Filter & Controls</div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div style="font-size: 0.9rem; color: #cbd5e1; margin-bottom: 6px;">Select Threat Types:</div>', unsafe_allow_html=True)
 selected_threats = st.sidebar.multiselect(
     "Select Threat Types:",
     options=df["Threat"].unique() if not df.empty else [],
@@ -689,9 +687,9 @@ selected_threats = st.sidebar.multiselect(
 
 filtered_df = df[df["Threat"].isin(selected_threats)] if not df.empty else df
 
-st.sidebar.markdown("<hr style='border-color: #1e222d; margin: 18px 0;'>", unsafe_allow_html=True)
+st.sidebar.markdown("<hr style='border-color: #1e222d; margin: 20px 0;'>", unsafe_allow_html=True)
 
-st.sidebar.markdown('<div style="font-size: 1rem; font-weight: 700; color: #ffffff; margin-bottom: 8px;">📡 Live Stream Simulation</div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div style="font-size: 1.1rem; font-weight: 700; color: #ffffff; margin-bottom: 10px;">Live Stream Simulation</div>', unsafe_allow_html=True)
 stream_live = st.sidebar.toggle("Enable Real-Time Packet Stream", value=False)
 
 if stream_live:
@@ -699,9 +697,10 @@ if stream_live:
     time.sleep(1.5)
     st.rerun()
 
-st.sidebar.markdown("<hr style='border-color: #1e222d; margin: 18px 0;'>", unsafe_allow_html=True)
+st.sidebar.markdown("<hr style='border-color: #1e222d; margin: 20px 0;'>", unsafe_allow_html=True)
 
-st.sidebar.markdown('<div style="font-size: 1rem; font-weight: 700; color: #ffffff; margin-bottom: 8px;">🛡️ Incident Response (SOAR)</div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div style="font-size: 1.1rem; font-weight: 700; color: #ffffff; margin-bottom: 10px;">🛡️ Incident Response (SOAR)</div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div style="font-size: 0.9rem; color: #cbd5e1; margin-bottom: 6px;">Select IP to Remediate:</div>', unsafe_allow_html=True)
 target_ip = st.sidebar.selectbox(
     "Select IP to Remediate:",
     options=filtered_df["IP"].unique() if not filtered_df.empty else ["N/A"],
@@ -712,7 +711,7 @@ if (
     st.sidebar.button("🚨 Block IP & Push Firewall Rule")
     and target_ip != "N/A"
 ):
-    with st.spinner(f"Pushing rule to iptables / Cloud Firewall for {target_ip}...\n"):
+    with st.spinner(f"Pushing rule to iptables / Cloud Firewall for {target_ip}..."):
         time.sleep(1.0)
 
     handle_security_event(
