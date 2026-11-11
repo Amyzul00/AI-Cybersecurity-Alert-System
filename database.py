@@ -18,7 +18,6 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Create threat_logs table if it doesn't exist
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS threat_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,7 +32,6 @@ def init_db():
         )
     ''')
 
-    # Create users table if it doesn't exist
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,18 +43,17 @@ def init_db():
         )
     ''')
 
-    # Safely check and add 'password' or 'role' columns if an older database version exists
+    # Inspect columns and automatically add missing ones
     cursor.execute("PRAGMA table_info(users)")
     columns = [col[1] for col in cursor.fetchall()]
     
-    if "password" not in columns:
+    if "password" not in columns and "hashed_password" not in columns:
         cursor.execute("ALTER TABLE users ADD COLUMN password TEXT NOT NULL DEFAULT ''")
     if "role" not in columns:
         cursor.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'")
 
     conn.commit()
     conn.close()
-
     print(f"[+] Database initialized successfully: {DB_NAME}")
 
 
@@ -64,9 +61,7 @@ def log_threat(
     src_ip, dst_ip, protocol, threat_type,
     severity, confidence_score, raw_features=""
 ):
-    """Record a detected threat in the database."""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
     try:
         conn = get_db_connection()
         conn.execute('''
@@ -87,7 +82,6 @@ def log_threat(
 
 
 def fetch_recent_threats(limit=50):
-    """Fetch the most recent threat logs."""
     conn = get_db_connection()
     try:
         rows = conn.execute(
@@ -99,5 +93,4 @@ def fetch_recent_threats(limit=50):
         conn.close()
 
 
-# Automatically initialize and migrate database on startup
 init_db()
