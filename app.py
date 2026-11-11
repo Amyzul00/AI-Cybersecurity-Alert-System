@@ -52,10 +52,10 @@ if 'temp_role' not in st.session_state:
 if 'temp_email' not in st.session_state:
     st.session_state['temp_email'] = ""
 if 'auth_view' not in st.session_state:
-    st.session_state['auth_view'] = "login"  # login, register, forgot
+    st.session_state['auth_view'] = "login"
 
 # ==========================================
-# ENTERPRISE SOC & MODERN CARD STYLING
+# ENTERPRISE SOC & FLOATING CARD STYLING
 # ==========================================
 st.markdown("""
     <style>
@@ -85,6 +85,22 @@ st.markdown("""
     .stTextInput > div > div > input:focus {
         border-color: #ff4b4b;
         box-shadow: 0 0 0 1px #ff4b4b;
+    }
+    /* Centered Floating Card Container matching reference */
+    .auth-outer-wrapper {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 40px 0;
+    }
+    .auth-card-container {
+        background-color: #070b19;
+        border: 1px solid #1e222d;
+        border-radius: 20px;
+        padding: 40px;
+        width: 100%;
+        max-width: 520px;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.9);
     }
     /* Professional Sidebar Card Styling */
     section[data-testid="stSidebar"] {
@@ -177,201 +193,204 @@ def send_email_notification(receiver_email, subject, html_content):
         return False
 
 # ==========================================
-# VIEW 1: CLEAN CENTERED AUTHENTICATION CARD
+# VIEW 1: FLOATING CARD AUTHENTICATION TEMPLATE
 # ==========================================
 if not st.session_state['logged_in']:
-    with st.container():
-        col_c1, col_c2, col_c3 = st.columns([1, 1.4, 1])
-        with col_c2:
-            st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True)
-            
-            # Company Logo & Title Header
-            logo_html = (
-                f'<div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px;">'
-                f'<img src="{logo_base64}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b;" alt="Logo">'
-                f'<div>'
-                f'<div style="font-weight: 700; color: #ffffff; font-size: 1.15rem;">Warisan Security</div>'
-                f'<div style="font-size: 0.82rem; color: #94a3b8;">Malware Operations & AI SOC</div>'
-                f'</div></div>'
-                if logo_base64
-                else ''
-            )
-            st.markdown(logo_html, unsafe_allow_html=True)
+    col_c1, col_c2, col_c3 = st.columns([1, 1.4, 1])
+    with col_c2:
+        # Open the Card Container Box wrapper
+        st.markdown('<div class="auth-outer-wrapper"><div class="auth-card-container">', unsafe_allow_html=True)
+        
+        # Company Logo & Header inside card
+        logo_html = (
+            f'<div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px;">'
+            f'<img src="{logo_base64}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b;" alt="Logo">'
+            f'<div>'
+            f'<div style="font-weight: 700; color: #ffffff; font-size: 1.15rem;">Warisan Security</div>'
+            f'<div style="font-size: 0.82rem; color: #94a3b8;">Malware Operations & AI SOC</div>'
+            f'</div></div>'
+            if logo_base64
+            else ''
+        )
+        st.markdown(logo_html, unsafe_allow_html=True)
 
-            if st.session_state['otp_required']:
-                st.info(f"🔒 OTP security verification sent to: **{st.session_state['temp_email']}**")
-                st.warning(f"🔑 **[CLOUD BYPASS DEBUG] Active OTP Code:** `{st.session_state['generated_otp']}`")
+        if st.session_state['otp_required']:
+            st.info(f"🔒 OTP security verification sent to: **{st.session_state['temp_email']}**")
+            st.warning(f"🔑 **[CLOUD BYPASS DEBUG] Active OTP Code:** `{st.session_state['generated_otp']}`")
+            
+            st.subheader("Enter 6-Digit OTP Code")
+            entered_otp = st.text_input("OTP Code", type="password", key="otp_input")
+            
+            c_otp1, c_otp2 = st.columns(2)
+            with c_otp1:
+                if st.button("Verify & Login", use_container_width=True):
+                    if entered_otp == st.session_state['generated_otp']:
+                        st.session_state['logged_in'] = True
+                        st.session_state['username'] = st.session_state['temp_username']
+                        st.session_state['role'] = st.session_state['temp_role']
+                        
+                        st.session_state['otp_required'] = False
+                        st.session_state['generated_otp'] = ""
+                        
+                        st.success("Verification successful! Loading dashboard...")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("Incorrect OTP code.")
+            with c_otp2:
+                if st.button("Cancel", use_container_width=True):
+                    st.session_state['otp_required'] = False
+                    st.rerun()
+
+        else:
+            # Mode toggle buttons (Log in vs Create account)
+            btn_col1, btn_col2 = st.columns(2)
+            with btn_col1:
+                if st.button("🔑 Log in", use_container_width=True):
+                    st.session_state['auth_view'] = "login"
+                    st.rerun()
+            with btn_col2:
+                if st.button("📝 Create account", use_container_width=True):
+                    st.session_state['auth_view'] = "register"
+                    st.rerun()
+
+            st.markdown("<hr style='border-color: #1e222d; margin: 15px 0;'>", unsafe_allow_html=True)
+
+            # --- LOGIN FORM VIEW ---
+            if st.session_state['auth_view'] == "login":
+                st.markdown('<h3 style="color: #ffffff; font-size: 1.3rem; margin-bottom: 4px;">Welcome back</h3>', unsafe_allow_html=True)
+                st.markdown('<p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 15px;">Enter your credentials to access the AI dashboard.</p>', unsafe_allow_html=True)
                 
-                st.subheader("Enter 6-Digit OTP Code")
-                entered_otp = st.text_input("OTP Code", type="password", key="otp_input")
+                login_user = st.text_input("Username", key="login_username")
+                login_pass = st.text_input("Password", type="password", key="login_password")
                 
-                c_otp1, c_otp2 = st.columns(2)
-                with c_otp1:
-                    if st.button("Verify & Login", use_container_width=True):
-                        if entered_otp == st.session_state['generated_otp']:
-                            st.session_state['logged_in'] = True
-                            st.session_state['username'] = st.session_state['temp_username']
-                            st.session_state['role'] = st.session_state['temp_role']
+                if st.button("Forgot password?", key="forgot_link_btn"):
+                    st.session_state['auth_view'] = "forgot"
+                    st.rerun()
+
+                st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)
+                if st.button("Log in", use_container_width=True, key="login_submit_btn"):
+                    if login_user and login_pass:
+                        try:
+                            conn = get_db_connection()
+                            cursor = conn.cursor()
+                            cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?", (login_user, login_pass))
+                            user = cursor.fetchone()
+                            cursor.close()
+                            conn.close()
                             
-                            st.session_state['otp_required'] = False
-                            st.session_state['generated_otp'] = ""
+                            if user:
+                                user_email = user['email']
+                                if not user_email:
+                                    st.error("Account missing registered email address.")
+                                else:
+                                    otp_code = str(random.randint(100000, 999999))
+                                    
+                                    st.session_state['generated_otp'] = otp_code
+                                    st.session_state['temp_username'] = user['username']
+                                    st.session_state['temp_role'] = user['role'] if 'role' in user else 'user'
+                                    st.session_state['temp_email'] = user_email
+                                    
+                                    st.session_state['otp_required'] = True
+                                    st.success("Credentials verified! Generating 2FA OTP...")
+                                    time.sleep(0.5)
+                                    st.rerun()
+                            else:
+                                st.error("Incorrect username or password.")
+                        except Exception as e:
+                            st.error(f"Database error: {e}")
+                    else:
+                        st.warning("Please fill in all fields.")
+
+            # --- REGISTER FORM VIEW ---
+            elif st.session_state['auth_view'] == "register":
+                st.markdown('<h3 style="color: #ffffff; font-size: 1.3rem; margin-bottom: 4px;">Create account</h3>', unsafe_allow_html=True)
+                st.markdown('<p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 15px;">Register for instant 2FA notifications and threat analytics.</p>', unsafe_allow_html=True)
+                
+                reg_user = st.text_input("Choose Username", key="reg_username")
+                reg_email = st.text_input("Email Address", key="reg_email")
+                reg_pass = st.text_input("Choose Password", type="password", key="reg_password")
+                
+                st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+                if st.button("Create account", use_container_width=True, key="register_submit_btn"):
+                    if reg_user and reg_email and reg_pass:
+                        try:
+                            conn = get_db_connection()
+                            cursor = conn.cursor()
+                            cursor.execute(
+                                "INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, ?)",
+                                (reg_user, reg_pass, reg_email, 'user')
+                            )
+                            conn.commit()
+                            cursor.close()
+                            conn.close()
                             
-                            st.success("Verification successful! Loading dashboard...")
+                            st.success("Account created successfully! Please log in.")
+                            st.session_state['auth_view'] = "login"
                             time.sleep(1)
                             st.rerun()
-                        else:
-                            st.error("Incorrect OTP code.")
-                with c_otp2:
-                    if st.button("Cancel", use_container_width=True):
-                        st.session_state['otp_required'] = False
-                        st.rerun()
+                        except Exception as err:
+                            st.error(f"Database error: {err}")
+                    else:
+                        st.warning("Please fill in all fields.")
 
-            else:
-                # Mode selection buttons (Log in vs Create account)
-                b_col1, b_col2 = st.columns(2)
-                with b_col1:
-                    if st.button("🔑 Log in", use_container_width=True):
+            # --- FORGOT PASSWORD FORM VIEW ---
+            elif st.session_state['auth_view'] == "forgot":
+                st.markdown('<h3 style="color: #ffffff; font-size: 1.3rem; margin-bottom: 4px;">Reset Password</h3>', unsafe_allow_html=True)
+                st.markdown('<p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 15px;">Enter your registered account email to receive your recovery details.</p>', unsafe_allow_html=True)
+                
+                forgot_email = st.text_input("Registered Email Address", key="forgot_email_input")
+                
+                st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+                col_f1, col_f2 = st.columns(2)
+                with col_f1:
+                    if st.button("Send Recovery", use_container_width=True):
+                        if forgot_email:
+                            try:
+                                conn = get_db_connection()
+                                cursor = conn.cursor()
+                                cursor.execute("SELECT username, password FROM users WHERE email = ?", (forgot_email,))
+                                matched_user = cursor.fetchone()
+                                cursor.close()
+                                conn.close()
+                                
+                                if matched_user:
+                                    recovery_html = f"""
+                                      <html>
+                                        <body style="font-family: Arial, sans-serif; background-color: #121212; color: #ffffff; padding: 20px;">
+                                          <div style="max-width: 600px; margin: auto; background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #ff4b4b;">
+                                            <h2 style="color: #ff4b4b;">🔐 Warisan Security Password Recovery</h2>
+                                            <p>Hello,</p>
+                                            <p>We received a password recovery request for your account.</p>
+                                            <p><b>Username:</b> {matched_user['username']}</p>
+                                            <p><b>Password:</b> {matched_user['password']}</p>
+                                            <p style="font-size: 12px; color: #888; margin-top: 20px;">If you did not request this, please secure your account immediately.</p>
+                                          </div>
+                                        </body>
+                                      </html>
+                                    """
+                                    success = send_email_notification(forgot_email, "🔐 Warisan Security Password Recovery", recovery_html)
+                                    if success:
+                                        st.success("Recovery details sent to your email successfully!")
+                                        st.toast("📧 Password recovery email dispatched!", icon="✅")
+                                        time.sleep(1.5)
+                                        st.session_state['auth_view'] = "login"
+                                        st.rerun()
+                                    else:
+                                        st.error("Failed to send email. Check SMTP configuration.")
+                                else:
+                                    st.error("No account found associated with this email.")
+                            except Exception as ex:
+                                st.error(f"Error: {ex}")
+                        else:
+                            st.warning("Please enter your registered email address.")
+                with col_f2:
+                    if st.button("Back to Login", use_container_width=True):
                         st.session_state['auth_view'] = "login"
                         st.rerun()
-                with b_col2:
-                    if st.button("📝 Create account", use_container_width=True):
-                        st.session_state['auth_view'] = "register"
-                        st.rerun()
 
-                st.markdown("<hr style='border-color: #1e222d; margin: 15px 0;'>", unsafe_allow_html=True)
-
-                # --- LOGIN VIEW ---
-                if st.session_state['auth_view'] == "login":
-                    st.markdown('<h3 style="color: #ffffff; font-size: 1.3rem; margin-bottom: 4px;">Welcome back</h3>', unsafe_allow_html=True)
-                    st.markdown('<p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 15px;">Enter your credentials to access the AI dashboard.</p>', unsafe_allow_html=True)
-                    
-                    login_user = st.text_input("Username", key="login_username")
-                    login_pass = st.text_input("Password", type="password", key="login_password")
-                    
-                    if st.button("Forgot password?", key="forgot_link_btn"):
-                        st.session_state['auth_view'] = "forgot"
-                        st.rerun()
-
-                    st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)
-                    if st.button("Log in", use_container_width=True, key="login_submit_btn"):
-                        if login_user and login_pass:
-                            try:
-                                conn = get_db_connection()
-                                cursor = conn.cursor()
-                                cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?", (login_user, login_pass))
-                                user = cursor.fetchone()
-                                cursor.close()
-                                conn.close()
-                                
-                                if user:
-                                    user_email = user['email']
-                                    if not user_email:
-                                        st.error("Account missing registered email address.")
-                                    else:
-                                        otp_code = str(random.randint(100000, 999999))
-                                        
-                                        st.session_state['generated_otp'] = otp_code
-                                        st.session_state['temp_username'] = user['username']
-                                        st.session_state['temp_role'] = user['role'] if 'role' in user else 'user'
-                                        st.session_state['temp_email'] = user_email
-                                        
-                                        st.session_state['otp_required'] = True
-                                        st.success("Credentials verified! Generating 2FA OTP...")
-                                        time.sleep(0.5)
-                                        st.rerun()
-                                else:
-                                    st.error("Incorrect username or password.")
-                            except Exception as e:
-                                st.error(f"Database error: {e}")
-                        else:
-                            st.warning("Please fill in all fields.")
-
-                # --- REGISTER VIEW ---
-                elif st.session_state['auth_view'] == "register":
-                    st.markdown('<h3 style="color: #ffffff; font-size: 1.3rem; margin-bottom: 4px;">Create account</h3>', unsafe_allow_html=True)
-                    st.markdown('<p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 15px;">Register for instant 2FA notifications and threat analytics.</p>', unsafe_allow_html=True)
-                    
-                    reg_user = st.text_input("Choose Username", key="reg_username")
-                    reg_email = st.text_input("Email Address", key="reg_email")
-                    reg_pass = st.text_input("Choose Password", type="password", key="reg_password")
-                    
-                    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-                    if st.button("Create account", use_container_width=True, key="register_submit_btn"):
-                        if reg_user and reg_email and reg_pass:
-                            try:
-                                conn = get_db_connection()
-                                cursor = conn.cursor()
-                                cursor.execute(
-                                    "INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, ?)",
-                                    (reg_user, reg_pass, reg_email, 'user')
-                                )
-                                conn.commit()
-                                cursor.close()
-                                conn.close()
-                                
-                                st.success("Account created successfully! Please log in.")
-                                st.session_state['auth_view'] = "login"
-                                time.sleep(1)
-                                st.rerun()
-                            except Exception as err:
-                                st.error(f"Database error: {err}")
-                        else:
-                            st.warning("Please fill in all fields.")
-
-                # --- FORGOT PASSWORD VIEW ---
-                elif st.session_state['auth_view'] == "forgot":
-                    st.markdown('<h3 style="color: #ffffff; font-size: 1.3rem; margin-bottom: 4px;">Reset Password</h3>', unsafe_allow_html=True)
-                    st.markdown('<p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 15px;">Enter your registered account email to receive your recovery details.</p>', unsafe_allow_html=True)
-                    
-                    forgot_email = st.text_input("Registered Email Address", key="forgot_email_input")
-                    
-                    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-                    col_f1, col_f2 = st.columns(2)
-                    with col_f1:
-                        if st.button("Send Recovery", use_container_width=True):
-                            if forgot_email:
-                                try:
-                                    conn = get_db_connection()
-                                    cursor = conn.cursor()
-                                    cursor.execute("SELECT username, password FROM users WHERE email = ?", (forgot_email,))
-                                    matched_user = cursor.fetchone()
-                                    cursor.close()
-                                    conn.close()
-                                    
-                                    if matched_user:
-                                        recovery_html = f"""
-                                          <html>
-                                            <body style="font-family: Arial, sans-serif; background-color: #121212; color: #ffffff; padding: 20px;">
-                                              <div style="max-width: 600px; margin: auto; background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #ff4b4b;">
-                                                <h2 style="color: #ff4b4b;">🔐 Warisan Security Password Recovery</h2>
-                                                <p>Hello,</p>
-                                                <p>We received a password recovery request for your account.</p>
-                                                <p><b>Username:</b> {matched_user['username']}</p>
-                                                <p><b>Password:</b> {matched_user['password']}</p>
-                                                <p style="font-size: 12px; color: #888; margin-top: 20px;">If you did not request this, please secure your account immediately.</p>
-                                              </div>
-                                            </body>
-                                          </html>
-                                        """
-                                        success = send_email_notification(forgot_email, "🔐 Warisan Security Password Recovery", recovery_html)
-                                        if success:
-                                            st.success("Recovery details sent to your email successfully!")
-                                            st.toast("📧 Password recovery email dispatched!", icon="✅")
-                                            time.sleep(1.5)
-                                            st.session_state['auth_view'] = "login"
-                                            st.rerun()
-                                        else:
-                                            st.error("Failed to send email. Check SMTP configuration.")
-                                    else:
-                                        st.error("No account found associated with this email.")
-                                except Exception as ex:
-                                    st.error(f"Error: {ex}")
-                            else:
-                                st.warning("Please enter your registered email address.")
-                    with col_f2:
-                        if st.button("Back to Login", use_container_width=True):
-                            st.session_state['auth_view'] = "login"
-                            st.rerun()
+        # Close the Card Container Box wrapper
+        st.markdown('</div></div>', unsafe_allow_html=True)
 
     st.stop()
 
