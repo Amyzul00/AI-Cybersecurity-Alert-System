@@ -34,7 +34,7 @@ st.set_page_config(
 # Initialize database connection using the shared SQLite helper
 conn = get_db_connection()
 
-# Initialize Session State for Access Control, 2FA OTP & Auth View
+# Initialize Session State for Access Control & 2FA OTP
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 if 'username' not in st.session_state:
@@ -51,95 +51,9 @@ if 'temp_role' not in st.session_state:
     st.session_state['temp_role'] = ""
 if 'temp_email' not in st.session_state:
     st.session_state['temp_email'] = ""
-if 'auth_view' not in st.session_state:
-    st.session_state['auth_view'] = "login"
 
 # ==========================================
-# ENTERPRISE SOC & STYLING
-# ==========================================
-st.markdown("""
-    <style>
-    .stApp {
-        background-color: #0e1117;
-    }
-    header {visibility: hidden;}
-    
-    div.stButton > button {
-        background-color: #ff4b4b;
-        color: white;
-        font-weight: 600;
-        border-radius: 8px;
-        border: none;
-        padding: 0.6rem 1rem;
-        transition: all 0.3s ease;
-    }
-    div.stButton > button:hover {
-        background-color: #ff2b2b;
-        box-shadow: 0 4px 14px rgba(255, 75, 75, 0.4);
-    }
-    .stTextInput > div > div > input {
-        background-color: #121624;
-        color: #ffffff;
-        border: 1px solid #2d3748;
-        border-radius: 8px;
-        padding: 10px;
-    }
-    .stTextInput > div > div > input:focus {
-        border-color: #ff4b4b;
-        box-shadow: 0 0 0 1px #ff4b4b;
-    }
-    
-    /* Professional Sidebar Styling matching screenshots */
-    section[data-testid="stSidebar"] {
-        background-color: #121212;
-        border-right: 1px solid #1e222d;
-    }
-    .sidebar-user-card {
-        background: #0d2318;
-        border: 1px solid #1a3a2a;
-        padding: 16px;
-        border-radius: 12px;
-        margin-bottom: 15px;
-    }
-    .sidebar-notif-card {
-        background: #171d29;
-        border: 1px solid #222b3c;
-        padding: 14px;
-        border-radius: 10px;
-        margin-bottom: 12px;
-    }
-    .sidebar-alert-card {
-        background: #241d13;
-        border: 1px solid #3c2e1b;
-        padding: 14px;
-        border-radius: 10px;
-        margin-bottom: 15px;
-    }
-    .soc-header-card {
-        background: linear-gradient(135deg, #121624 0%, #070b19 100%);
-        border: 1px solid #1e222d;
-        border-radius: 12px;
-        padding: 25px;
-        margin-bottom: 25px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-
-def get_base64_image(image_path):
-    try:
-        with open(image_path, "rb") as img_file:
-            encoded = base64.b64encode(img_file.read()).decode()
-            return f"data:image/png;base64,{encoded}"
-    except Exception:
-        return ""
-
-
-logo_base64 = get_base64_image("Logo.png")
-
-# ==========================================
-# EMAIL NOTIFICATION FUNCTIONS
+# EMAIL NOTIFICATION FUNCTIONS (WELCOME & OTP 2FA)
 # ==========================================
 def send_email_notification(receiver_email, subject, html_content):
     sender_email = "sendermalwaree@gmail.com"
@@ -165,32 +79,28 @@ def send_email_notification(receiver_email, subject, html_content):
         return False
 
 # ==========================================
-# VIEW 1: PROFESSIONAL FLOATING CARD AUTHENTICATION
+# VIEW 1: LOGIN, OTP & REGISTER PAGE
 # ==========================================
 if not st.session_state['logged_in']:
-    c_left, c_center, c_right = st.columns([1, 1.2, 1])
-    with c_center:
-        st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True)
-        st.markdown('<div style="background: #070b19; padding: 35px; border-radius: 16px; border: 1px solid #1e222d; box-shadow: 0 25px 50px rgba(0, 0, 0, 0.9);">', unsafe_allow_html=True)
+    st.markdown("""
+        <div style="text-align: center; padding: 20px;">
+            <h1 style="color: #ff4b4b;">🛡️ Warisan Security Malware Operations</h1>
+            <p style="color: #8a99ad; font-size: 1.1rem;">Please Login, Enter OTP, or Register an Account to Access the AI Dashboard</p>
+        </div>
+    """, unsafe_allow_html=True)
 
-        logo_html = (
-            f'<div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px;">'
-            f'<img src="{logo_base64}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b;" alt="Logo">'
-            f'<div>'
-            f'<div style="font-weight: 700; color: #ffffff; font-size: 1.15rem;">Warisan Security</div>'
-            f'<div style="font-size: 0.82rem; color: #94a3b8;">Malware Operations & AI SOC</div>'
-            f'</div></div>'
-            if logo_base64
-            else ''
-        )
-        st.markdown(logo_html, unsafe_allow_html=True)
-
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        # 2FA OTP Verification Screen
         if st.session_state['otp_required']:
-            st.info(f"🔒 OTP security verification sent to: **{st.session_state['temp_email']}**")
-            st.warning(f"🔑 **[CLOUD BYPASS DEBUG] Active OTP Code:** `{st.session_state['generated_otp']}`")
+            st.info(f"🔒 A security verification code (OTP) has been generated for: **{st.session_state['temp_email']}**")
+            
+            # --- ON-SCREEN CLOUD BYPASS DEBUG BANNER ---
+            st.warning(f"🔑 **[CLOUD BYPASS DEBUG] Your Active OTP Code is:** `{st.session_state['generated_otp']}`")
             
             st.subheader("Enter 6-Digit OTP Code")
-            entered_otp = st.text_input("OTP Code", type="password", key="otp_input")
+            
+            entered_otp = st.text_input("Enter OTP Code", type="password", key="otp_input")
             
             c_otp1, c_otp2 = st.columns(2)
             with c_otp1:
@@ -203,42 +113,26 @@ if not st.session_state['logged_in']:
                         st.session_state['otp_required'] = False
                         st.session_state['generated_otp'] = ""
                         
-                        st.success("Verification successful! Loading dashboard...")
+                        st.success("OTP verification successful! Loading dashboard...")
                         time.sleep(1)
                         st.rerun()
                     else:
-                        st.error("Incorrect OTP code.")
+                        st.error("Incorrect OTP code. Please check the debug code shown above.")
             with c_otp2:
                 if st.button("Cancel", use_container_width=True):
                     st.session_state['otp_required'] = False
                     st.rerun()
 
         else:
-            b_col1, b_col2 = st.columns(2)
-            with b_col1:
-                if st.button("🔑 Log in", use_container_width=True):
-                    st.session_state['auth_view'] = "login"
-                    st.rerun()
-            with b_col2:
-                if st.button("📝 Create account", use_container_width=True):
-                    st.session_state['auth_view'] = "register"
-                    st.rerun()
+            tab_login, tab_register = st.tabs(["🔑 Login", "📝 Register Account"])
 
-            st.markdown("<hr style='border-color: #1e222d; margin: 15px 0;'>", unsafe_allow_html=True)
-
-            if st.session_state['auth_view'] == "login":
-                st.markdown('<h3 style="color: #ffffff; font-size: 1.3rem; margin-bottom: 4px;">Welcome back</h3>', unsafe_allow_html=True)
-                st.markdown('<p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 15px;">Enter your credentials to access the AI dashboard.</p>', unsafe_allow_html=True)
-                
+            # --- LOGIN TAB ---
+            with tab_login:
+                st.subheader("System Login (2FA Security)")
                 login_user = st.text_input("Username", key="login_username")
                 login_pass = st.text_input("Password", type="password", key="login_password")
                 
-                if st.button("Forgot password?", key="forgot_link_btn"):
-                    st.session_state['auth_view'] = "forgot"
-                    st.rerun()
-
-                st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)
-                if st.button("Log in", use_container_width=True, key="login_submit_btn"):
+                if st.button("Proceed to OTP Verification", use_container_width=True):
                     if login_user and login_pass:
                         try:
                             conn = get_db_connection()
@@ -251,7 +145,7 @@ if not st.session_state['logged_in']:
                             if user:
                                 user_email = user['email']
                                 if not user_email:
-                                    st.error("Account missing registered email address.")
+                                    st.error("Your account does not have a registered email address.")
                                 else:
                                     otp_code = str(random.randint(100000, 999999))
                                     
@@ -261,26 +155,24 @@ if not st.session_state['logged_in']:
                                     st.session_state['temp_email'] = user_email
                                     
                                     st.session_state['otp_required'] = True
-                                    st.success("Credentials verified! Generating 2FA OTP...")
+                                    st.success("Credentials verified! OTP generated successfully.")
                                     time.sleep(0.5)
                                     st.rerun()
                             else:
-                                st.error("Incorrect username or password.")
+                                st.error("Incorrect Username or Password!")
                         except Exception as e:
                             st.error(f"Database error: {e}")
                     else:
                         st.warning("Please fill in all fields.")
 
-            elif st.session_state['auth_view'] == "register":
-                st.markdown('<h3 style="color: #ffffff; font-size: 1.3rem; margin-bottom: 4px;">Create account</h3>', unsafe_allow_html=True)
-                st.markdown('<p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 15px;">Register for instant 2FA notifications and threat analytics.</p>', unsafe_allow_html=True)
-                
+            # --- REGISTER TAB ---
+            with tab_register:
+                st.subheader("Register New Account & Notifications")
                 reg_user = st.text_input("Choose Username", key="reg_username")
-                reg_email = st.text_input("Email Address", key="reg_email")
+                reg_email = st.text_input("Email Address (For Notifications & OTP)", key="reg_email")
                 reg_pass = st.text_input("Choose Password", type="password", key="reg_password")
                 
-                st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-                if st.button("Create account", use_container_width=True, key="register_submit_btn"):
+                if st.button("Register Now", use_container_width=True):
                     if reg_user and reg_email and reg_pass:
                         try:
                             conn = get_db_connection()
@@ -293,75 +185,18 @@ if not st.session_state['logged_in']:
                             cursor.close()
                             conn.close()
                             
-                            st.success("Account created successfully! Please log in.")
-                            st.session_state['auth_view'] = "login"
-                            time.sleep(1)
-                            st.rerun()
+                            st.success("Account successfully registered! Please switch to the 'Login' tab.")
                         except Exception as err:
                             st.error(f"Database error: {err}")
                     else:
-                        st.warning("Please fill in all fields.")
+                        st.warning("Please fill in all fields including email.")
 
-            elif st.session_state['auth_view'] == "forgot":
-                st.markdown('<h3 style="color: #ffffff; font-size: 1.3rem; margin-bottom: 4px;">Reset Password</h3>', unsafe_allow_html=True)
-                st.markdown('<p style="color: #94a3b8; font-size: 0.85rem; margin-bottom: 15px;">Enter your registered account email to receive your recovery details.</p>', unsafe_allow_html=True)
-                
-                forgot_email = st.text_input("Registered Email Address", key="forgot_email_input")
-                
-                st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-                col_f1, col_f2 = st.columns(2)
-                with col_f1:
-                    if st.button("Send Recovery", use_container_width=True):
-                        if forgot_email:
-                            try:
-                                conn = get_db_connection()
-                                cursor = conn.cursor()
-                                cursor.execute("SELECT username, password FROM users WHERE email = ?", (forgot_email,))
-                                matched_user = cursor.fetchone()
-                                cursor.close()
-                                conn.close()
-                                
-                                if matched_user:
-                                    recovery_html = f"""
-                                      <html>
-                                        <body style="font-family: Arial, sans-serif; background-color: #121212; color: #ffffff; padding: 20px;">
-                                          <div style="max-width: 600px; margin: auto; background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #ff4b4b;">
-                                            <h2 style="color: #ff4b4b;">🔐 Warisan Security Password Recovery</h2>
-                                            <p>Hello,</p>
-                                            <p>We received a password recovery request for your account.</p>
-                                            <p><b>Username:</b> {matched_user['username']}</p>
-                                            <p><b>Password:</b> {matched_user['password']}</p>
-                                            <p style="font-size: 12px; color: #888; margin-top: 20px;">If you did not request this, please secure your account immediately.</p>
-                                          </div>
-                                        </body>
-                                      </html>
-                                    """
-                                    success = send_email_notification(forgot_email, "🔐 Warisan Security Password Recovery", recovery_html)
-                                    if success:
-                                        st.success("Recovery details sent to your email successfully!")
-                                        st.toast("📧 Password recovery email dispatched!", icon="✅")
-                                        time.sleep(1.5)
-                                        st.session_state['auth_view'] = "login"
-                                        st.rerun()
-                                    else:
-                                        st.error("Failed to send email. Check SMTP configuration.")
-                                else:
-                                    st.error("No account found associated with this email.")
-                            except Exception as ex:
-                                st.error(f"Error: {ex}")
-                        else:
-                            st.warning("Please enter your registered email address.")
-                with col_f2:
-                    if st.button("Back to Login", use_container_width=True):
-                        st.session_state['auth_view'] = "login"
-                        st.rerun()
-
-        st.markdown('</div>', unsafe_allow_html=True)
+    # Stop execution here if user is not logged in
     st.stop()
 
 
 # ==========================================
-# VIEW 2: MAIN DASHBOARD (AFTER SUCCESSFUL LOGIN)
+# VIEW 2: MAIN DASHBOARD (AFTER SUCCESSFUL LOGIN & OTP)
 # ==========================================
 st.markdown(
     """
@@ -384,8 +219,20 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+
+def get_base64_image(image_path):
+    try:
+        with open(image_path, "rb") as img_file:
+            encoded = base64.b64encode(img_file.read()).decode()
+            return f"data:image/png;base64,{encoded}"
+    except Exception:
+        return ""
+
+
+logo_base64 = get_base64_image("Logo.png")
+
 # ==========================================
-# 2. Executive Header & Action Controls
+# 2. Header & Action Controls
 # ==========================================
 col_header, col_btn = st.columns([4, 1])
 
@@ -393,11 +240,11 @@ with col_header:
     if logo_base64:
         st.markdown(
             f"""
-            <div class="soc-header-card" style="display: flex; align-items: center; gap: 20px;">
-                <img src="{logo_base64}" style="width: 85px; height: 85px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 12px rgba(255, 75, 75, 0.4);" alt="Logo">
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <img src="{logo_base64}" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 10px rgba(0,0,0,0.5);" alt="Logo">
                 <div>
-                    <h1 style="margin: 0; font-size: 2.1rem; color: #ffffff; font-weight: 700; letter-spacing: -0.5px;">Warisan Security Malware Operations</h1>
-                    <p style="margin: 6px 0 0 0; color: #94a3b8; font-size: 0.95rem; font-weight: 500;">🔒 Dynamic Threat Detection, Automated Incident Analytics & SOAR</p>
+                    <h1 style="margin: 0; font-size: 2.2rem; color: #ffffff;">Warisan Security Malware Operations</h1>
+                    <p style="margin: 5px 0 0 0; color: #8a99ad; font-size: 1rem;">🔒 Dynamic Threat Detection, Automated Incident Analytics & SOAR</p>
                 </div>
             </div>
             """,
@@ -411,8 +258,7 @@ with col_header:
 
 with col_btn:
     st.write(" ")
-    st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
-    rescan_clicked = st.button("🔄 Refresh & Rescan", use_container_width=True)
+    rescan_clicked = st.button("🔄 Refresh & Rescan")
 
 if rescan_clicked:
     st.cache_data.clear()
@@ -440,6 +286,7 @@ if load_detection_engine():
 
 @st.cache_data
 def get_backend_predictions():
+    """Extracts live telemetry and inference results with safe backend fallback."""
     formatted_data = []
     try:
         import threat_detector
@@ -706,11 +553,11 @@ def broadcast_pdf_report_to_all_users(pdf_buffer):
 
 
 # ==========================================
-# 6. Restored Professional Sidebar (Matching Screenshots)
+# 6. Sidebar Filtering, User Session & Notifications
 # ==========================================
 if logo_base64:
     st.sidebar.markdown(
-        f'<div style="text-align: center; margin-bottom: 20px;"><img src="{logo_base64}" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 12px rgba(255, 75, 75, 0.4);"></div>',
+        f'<div style="text-align: center; margin-bottom: 15px;"><img src="{logo_base64}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b;"></div>',
         unsafe_allow_html=True,
     )
 else:
@@ -718,18 +565,8 @@ else:
         "https://img.icons8.com/color/96/000000/cyber-security.png", width=80
     )
 
-# User Session Card
-role_str = st.session_state['role'].upper()
-st.sidebar.markdown(f"""
-    <div class="sidebar-user-card">
-        <div style="font-size: 1.05rem; font-weight: 700; color: #4ade80; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
-            👤 User: <span style="color: #ffffff;">{st.session_state['username']}</span>
-        </div>
-        <div style="font-size: 0.95rem; font-weight: 700; color: #facc15; display: flex; align-items: center; gap: 8px;">
-            🔑 Role: <span style="color: #ffffff;">{role_str}</span>
-        </div>
-    </div>
-""", unsafe_allow_html=True)
+# Logged-in User Account Info
+st.sidebar.success(f"👤 User: **{st.session_state['username']}**\n\n🔑 Role: **{st.session_state['role'].upper()}**")
 
 if st.sidebar.button("🚪 Logout", use_container_width=True):
     st.session_state['logged_in'] = False
@@ -737,49 +574,26 @@ if st.sidebar.button("🚪 Logout", use_container_width=True):
     st.session_state['role'] = ""
     st.rerun()
 
-st.sidebar.markdown("<hr style='border-color: #1e222d; margin: 20px 0;'>", unsafe_allow_html=True)
+st.sidebar.divider()
 
-# Notification & Alert Center Section
-st.sidebar.markdown("""
-    <div style="font-size: 1.05rem; font-weight: 700; color: #ffffff; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-        🔔 Notification & Alert Center
-    </div>
-""", unsafe_allow_html=True)
+# User Notification Center
+st.sidebar.subheader("🔔 Notification & Alert Center")
+st.sidebar.info("📩 Notification Subscription Status: **Active (Inbox & 2FA Email)**")
+st.sidebar.warning("⚠️ 2 Critical Alerts (DDoS/Botnet) newly detected for your account.")
 
-st.sidebar.markdown("""
-    <div class="sidebar-notif-card">
-        <div style="font-size: 0.9rem; font-weight: 600; color: #93c5fd; line-height: 1.4;">
-            📥 Notification Subscription Status: <span style="color: #ffffff;">Active (Inbox & 2FA Email)</span>
-        </div>
-    </div>
-""", unsafe_allow_html=True)
+st.sidebar.divider()
+st.sidebar.header("Filter & Controls")
 
-st.sidebar.markdown("""
-    <div class="sidebar-alert-card">
-        <div style="font-size: 0.9rem; font-weight: 600; color: #facc15; line-height: 1.4;">
-            ⚠️ 2 Critical Alerts (DDoS/Botnet) newly detected for your account.
-        </div>
-    </div>
-""", unsafe_allow_html=True)
-
-st.sidebar.markdown("<hr style='border-color: #1e222d; margin: 20px 0;'>", unsafe_allow_html=True)
-
-# Filter & Controls
-st.sidebar.markdown('<div style="font-size: 1.1rem; font-weight: 700; color: #ffffff; margin-bottom: 10px;">Filter & Controls</div>', unsafe_allow_html=True)
-st.sidebar.markdown('<div style="font-size: 0.9rem; color: #cbd5e1; margin-bottom: 6px;">Select Threat Types:</div>', unsafe_allow_html=True)
 selected_threats = st.sidebar.multiselect(
     "Select Threat Types:",
     options=df["Threat"].unique() if not df.empty else [],
     default=list(df["Threat"].unique()) if not df.empty else [],
-    label_visibility="collapsed"
 )
 
 filtered_df = df[df["Threat"].isin(selected_threats)] if not df.empty else df
 
-st.sidebar.markdown("<hr style='border-color: #1e222d; margin: 20px 0;'>", unsafe_allow_html=True)
-
-# Live Stream Simulation
-st.sidebar.markdown('<div style="font-size: 1.1rem; font-weight: 700; color: #ffffff; margin-bottom: 10px;">Live Stream Simulation</div>', unsafe_allow_html=True)
+st.sidebar.divider()
+st.sidebar.subheader("🔴 Live Stream Simulation")
 stream_live = st.sidebar.toggle("Enable Real-Time Packet Stream", value=False)
 
 if stream_live:
@@ -787,15 +601,11 @@ if stream_live:
     time.sleep(1.5)
     st.rerun()
 
-st.sidebar.markdown("<hr style='border-color: #1e222d; margin: 20px 0;'>", unsafe_allow_html=True)
-
-# Incident Response (SOAR)
-st.sidebar.markdown('<div style="font-size: 1.1rem; font-weight: 700; color: #ffffff; margin-bottom: 10px;">🛡️ Incident Response (SOAR)</div>', unsafe_allow_html=True)
-st.sidebar.markdown('<div style="font-size: 0.9rem; color: #cbd5e1; margin-bottom: 6px;">Select IP to Remediate:</div>', unsafe_allow_html=True)
+st.sidebar.divider()
+st.sidebar.subheader("🛡️ Incident Response (SOAR)")
 target_ip = st.sidebar.selectbox(
     "Select IP to Remediate:",
     options=filtered_df["IP"].unique() if not filtered_df.empty else ["N/A"],
-    label_visibility="collapsed"
 )
 
 if (
