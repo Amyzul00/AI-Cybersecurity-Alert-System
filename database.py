@@ -105,5 +105,5 @@ def fetch_recent_threats(limit=50):
         conn.close()
 
 
-if __name__ == "__main__":
-    init_db()
+# Automatically initialize database on import for Streamlit Cloud
+init_db()
