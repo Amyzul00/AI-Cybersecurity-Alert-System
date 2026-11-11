@@ -40,7 +40,7 @@ def init_db():
     if table_exists:
         cursor.execute("PRAGMA table_info(users);")
         columns = [col[1] for col in cursor.fetchall()]
-        # If 'password' column is missing or old schema exists, drop and recreate cleanly
+        # If 'password' column is missing, drop and recreate cleanly
         if "password" not in columns:
             cursor.execute("DROP TABLE users;")
             table_exists = None
