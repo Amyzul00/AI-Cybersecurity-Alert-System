@@ -14,7 +14,7 @@ def get_db_connection():
 
 
 def init_db():
-    """Initialize threat logs and user account tables."""
+    """Initialize threat logs and user account tables with automatic schema migration."""
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -33,11 +33,18 @@ def init_db():
         )
     ''')
 
-    # Automatically check and migrate users table if old column exists
-    cursor.execute("PRAGMA table_info(users)")
-    columns = [col[1] for col in cursor.fetchall()]
-    if "hashed_password" in columns:
-        cursor.execute("DROP TABLE users")
+    # Automatically check if users table exists and has the 'password' column
+    cursor.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='users'"
+    )
+    table_exists = cursor.fetchone()
+
+    if table_exists:
+        cursor.execute("PRAGMA table_info(users)")
+        columns = [col[1] for col in cursor.fetchall()]
+        # If the table exists but lacks 'password' (or has old schema), drop it to recreate
+        if "password" not in columns:
+            cursor.execute("DROP TABLE users")
 
     # Table for user registration and login using 'password'
     cursor.execute('''
