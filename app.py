@@ -133,7 +133,7 @@ if not st.session_state['logged_in']:
                         try:
                             conn = get_db_connection()
                             cursor = conn.cursor(dictionary=True)
-                            cursor.execute("SELECT * FROM users WHERE username = %s AND password = %s", (login_user, login_pass))
+                            cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?", (login_user, login_pass))
                             user = cursor.fetchone()
                             cursor.close()
                             conn.close()
