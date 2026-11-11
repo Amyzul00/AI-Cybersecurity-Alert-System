@@ -191,10 +191,10 @@ def send_email_notification(receiver_email, subject, html_content):
 # VIEW 1: PROFESSIONAL FLOATING CARD AUTHENTICATION
 # ==========================================
 if not st.session_state['logged_in']:
-    # Single unified card container wrapping everything cleanly
+    # 1. Open the card container FIRST before any content
     st.markdown('<div style="background: #070b19; padding: 35px; border-radius: 16px; border: 1px solid #1e222d; box-shadow: 0 25px 50px rgba(0, 0, 0, 0.9);">', unsafe_allow_html=True)
 
-    # Company Logo & Title Header inside card
+    # 2. Company Logo & Title Header inside card
     logo_html = (
         f'<div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px;">'
         f'<img src="{logo_base64}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b;" alt="Logo">'
@@ -382,6 +382,7 @@ if not st.session_state['logged_in']:
                     st.session_state['auth_view'] = "login"
                     st.rerun()
 
+    # 3. Close the card container div at the very end of View 1
     st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
