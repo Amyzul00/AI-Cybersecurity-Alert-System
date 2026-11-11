@@ -33,13 +33,13 @@ def init_db():
         )
     ''')
 
-    # New table for user registration and login
+    # Updated table for user registration and login using 'password'
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE,
             email TEXT NOT NULL UNIQUE,
-            hashed_password TEXT NOT NULL,
+            password TEXT NOT NULL,
             role TEXT NOT NULL DEFAULT 'analyst',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
