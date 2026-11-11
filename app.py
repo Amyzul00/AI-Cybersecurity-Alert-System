@@ -70,41 +70,11 @@ logo_base64 = get_base64_image("Logo.png")
 st.markdown("""
     <style>
     .stApp {
-        background-color: #070b19;
+        background-color: #0e1117;
     }
     header {visibility: hidden;}
     
-    /* Professional Enterprise Buttons */
-    div.stButton > button {
-        background: linear-gradient(135deg, #ff4b4b 0%, #e63946 100%);
-        color: white;
-        font-weight: 600;
-        border-radius: 8px;
-        border: none;
-        padding: 0.6rem 1.2rem;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 12px rgba(255, 75, 75, 0.3);
-    }
-    div.stButton > button:hover {
-        background: linear-gradient(135deg, #ff2b2b 0%, #d90429 100%);
-        box-shadow: 0 6px 18px rgba(255, 75, 75, 0.5);
-        transform: translateY(-1px);
-    }
-    
-    /* Sleek Input Fields */
-    .stTextInput > div > div > input, .stSelectbox > div > div > div {
-        background-color: #121624 !important;
-        color: #ffffff !important;
-        border: 1px solid #1e222d !important;
-        border-radius: 8px !important;
-        padding: 10px !important;
-    }
-    .stTextInput > div > div > input:focus {
-        border-color: #ff4b4b !important;
-        box-shadow: 0 0 0 1px #ff4b4b !important;
-    }
-    
-    /* Sidebar Enterprise Styling matching screenshots */
+    /* Professional Sidebar Styling matching screenshots */
     section[data-testid="stSidebar"] {
         background-color: #121212;
         border-right: 1px solid #1e222d;
@@ -129,15 +99,6 @@ st.markdown("""
         padding: 14px;
         border-radius: 10px;
         margin-bottom: 15px;
-    }
-    
-    /* Professional Card Containers */
-    .soc-card {
-        background: #121624;
-        border: 1px solid #1e222d;
-        border-radius: 12px;
-        padding: 24px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
     }
     .soc-header-card {
         background: linear-gradient(135deg, #121624 0%, #070b19 100%);
@@ -198,7 +159,7 @@ if not st.session_state['logged_in']:
             unsafe_allow_html=True,
         )
 
-        st.markdown('<div class="soc-card" style="box-shadow: 0 25px 50px rgba(0, 0, 0, 0.9);">', unsafe_allow_html=True)
+        st.markdown('<div style="background: #070b19; padding: 35px; border-radius: 16px; border: 1px solid #1e222d; box-shadow: 0 25px 50px rgba(0, 0, 0, 0.9);">', unsafe_allow_html=True)
 
         if st.session_state['otp_required']:
             st.info(f"🔒 Security verification code (OTP) sent to: **{st.session_state['temp_email']}**")
@@ -313,20 +274,17 @@ st.markdown(
     """
     <style>
     .main { 
-        background-color: #070b19; 
+        background-color: #0e1117; 
     }
     div[data-testid="stMetricValue"] {
         font-size: 1.8rem;
         font-weight: 700;
-        color: #ffffff;
     }
     div[data-testid="stMetric"] {
-        background-color: #121624;
-        border-radius: 12px;
-        padding: 18px;
-        border: 1px solid #1e222d;
+        background-color: #1e222d;
+        border-radius: 8px;
+        padding: 15px;
         border-left: 4px solid #ff4b4b;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.3);
     }
     </style>
 """,
