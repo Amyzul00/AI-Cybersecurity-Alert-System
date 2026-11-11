@@ -14,10 +14,11 @@ def get_db_connection():
 
 
 def init_db():
-    """Initialize threat logs and user account tables with automatic schema migration."""
+    """Initialize threat logs and user tables with robust schema validation."""
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # Create threat_logs table if it doesn't exist
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS threat_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,25 +33,30 @@ def init_db():
         )
     ''')
 
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL UNIQUE,
-            email TEXT NOT NULL UNIQUE,
-            role TEXT NOT NULL DEFAULT 'user',
-            password TEXT NOT NULL DEFAULT '',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+    # Check if 'users' table exists and has the correct 'password' column
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users';")
+    table_exists = cursor.fetchone()
 
-    # Inspect columns and automatically add missing ones
-    cursor.execute("PRAGMA table_info(users)")
-    columns = [col[1] for col in cursor.fetchall()]
-    
-    if "password" not in columns and "hashed_password" not in columns:
-        cursor.execute("ALTER TABLE users ADD COLUMN password TEXT NOT NULL DEFAULT ''")
-    if "role" not in columns:
-        cursor.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'")
+    if table_exists:
+        cursor.execute("PRAGMA table_info(users);")
+        columns = [col[1] for col in cursor.fetchall()]
+        # If 'password' column is missing or old schema exists, drop and recreate cleanly
+        if "password" not in columns:
+            cursor.execute("DROP TABLE users;")
+            table_exists = None
+
+    # Create users table with correct schema if it doesn't exist or was dropped
+    if not table_exists:
+        cursor.execute('''
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                email TEXT NOT NULL UNIQUE,
+                role TEXT NOT NULL DEFAULT 'user',
+                password TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
 
     conn.commit()
     conn.close()
@@ -61,7 +67,9 @@ def log_threat(
     src_ip, dst_ip, protocol, threat_type,
     severity, confidence_score, raw_features=""
 ):
+    """Record a detected threat in the database."""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     try:
         conn = get_db_connection()
         conn.execute('''
@@ -82,6 +90,7 @@ def log_threat(
 
 
 def fetch_recent_threats(limit=50):
+    """Fetch the most recent threat logs."""
     conn = get_db_connection()
     try:
         rows = conn.execute(
@@ -93,4 +102,5 @@ def fetch_recent_threats(limit=50):
         conn.close()
 
 
+# Automatically initialize and validate database on startup
 init_db()
