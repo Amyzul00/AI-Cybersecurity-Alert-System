@@ -24,25 +24,15 @@ from reportlab.platypus import (
 )
 import streamlit as st
 from database import get_db_connection
-# ...
-conn = get_db_connection()
-
-# ==========================================
-# 0. MySQL Connection & Session Configuration
-# ==========================================
-def get_db_connection():
-    return mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="",  # Enter your MySQL password here if any
-        database="cybersecurity_db"
-    )
 
 st.set_page_config(
     page_title="Warisan Security Malware Operations - AI Threat Detection",
     page_icon="Logo.png",
     layout="wide",
 )
+
+# Initialize database connection using the shared SQLite helper
+conn = get_db_connection()
 
 # Initialize Session State for Access Control & 2FA OTP
 if 'logged_in' not in st.session_state:
