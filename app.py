@@ -84,16 +84,6 @@ st.markdown("""
         border-color: #ff4b4b;
         box-shadow: 0 0 0 1px #ff4b4b;
     }
-    /* Modern Floating Authentication Card */
-    .auth-card-wrapper {
-        background: #070b19;
-        border: 1px solid #1e222d;
-        border-radius: 20px;
-        padding: 35px;
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
-        margin-top: 20px;
-        margin-bottom: 40px;
-    }
     /* Professional Sidebar Card Styling */
     section[data-testid="stSidebar"] {
         background-color: #070b19;
@@ -185,19 +175,17 @@ def send_email_notification(receiver_email, subject, html_content):
         return False
 
 # ==========================================
-# VIEW 1: MODERN FLOATING CARD LOGIN / REGISTER
+# VIEW 1: CLEAN FLOATING CARD LOGIN / REGISTER
 # ==========================================
 if not st.session_state['logged_in']:
-    col_l1, col_l2, col_l3 = st.columns([1, 1.3, 1])
+    col_l1, col_l2, col_l3 = st.columns([1, 1.4, 1])
     with col_l2:
-        st.markdown('<div class="auth-card-wrapper">', unsafe_allow_html=True)
-        
-        # Logo & Brand Header Inside Card
+        # Logo & Brand Header
         logo_html = (
-            f'<div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px;">'
-            f'<img src="{logo_base64}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b;" alt="Logo">'
+            f'<div style="display: flex; align-items: center; gap: 14px; margin-bottom: 25px; margin-top: 20px;">'
+            f'<img src="{logo_base64}" style="width: 55px; height: 55px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b;" alt="Logo">'
             f'<div>'
-            f'<div style="font-weight: 700; color: #ffffff; font-size: 1.15rem;">Warisan Security</div>'
+            f'<div style="font-weight: 700; color: #ffffff; font-size: 1.2rem;">Warisan Security</div>'
             f'<div style="font-size: 0.85rem; color: #94a3b8;">Malware Operations & AI SOC</div>'
             f'</div></div>'
             if logo_base64
@@ -306,8 +294,6 @@ if not st.session_state['logged_in']:
                             st.error(f"Database error: {err}")
                     else:
                         st.warning("Please fill in all fields.")
-
-        st.markdown('</div>', unsafe_allow_html=True)
 
     st.stop()
 
