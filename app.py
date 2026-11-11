@@ -55,13 +55,16 @@ if 'auth_view' not in st.session_state:
     st.session_state['auth_view'] = "login"
 
 # ==========================================
-# ENTERPRISE SOC & PROFESSIONAL UI STYLING
+# ENTERPRISE SOC & CENTERED CARD STYLING
 # ==========================================
 st.markdown("""
     <style>
     .stApp {
         background-color: #0e1117;
     }
+    /* Hide top header whitespace */
+    header {visibility: hidden;}
+    
     /* Professional Form Buttons */
     div.stButton > button {
         background-color: #ff4b4b;
@@ -87,16 +90,15 @@ st.markdown("""
         border-color: #ff4b4b;
         box-shadow: 0 0 0 1px #ff4b4b;
     }
-    /* Professional Centered Auth Card */
-    .auth-card-container {
-        background-color: #070b19;
-        border: 1px solid #1e222d;
-        border-radius: 16px;
-        padding: 40px;
-        max-width: 480px;
-        margin: 40px auto;
-        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.85);
+    
+    /* Perfect Centered Floating Card Container */
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        max-width: 520px;
+        margin: auto;
     }
+    
     /* Professional Sidebar Card Styling */
     section[data-testid="stSidebar"] {
         background-color: #070b19;
@@ -188,14 +190,12 @@ def send_email_notification(receiver_email, subject, html_content):
         return False
 
 # ==========================================
-# VIEW 1: PROFESSIONAL AUTHENTICATION CARD
+# VIEW 1: PROFESSIONAL FLOATING CARD AUTHENTICATION
 # ==========================================
 if not st.session_state['logged_in']:
-    st.markdown('<div class="auth-card-container">', unsafe_allow_html=True)
-    
     # Company Logo & Title Header
     logo_html = (
-        f'<div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px;">'
+        f'<div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px; background: #070b19; padding: 20px; border-radius: 16px 16px 0 0; border: 1px solid #1e222d; border-bottom: none;">'
         f'<img src="{logo_base64}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b;" alt="Logo">'
         f'<div>'
         f'<div style="font-weight: 700; color: #ffffff; font-size: 1.15rem;">Warisan Security</div>'
@@ -205,6 +205,9 @@ if not st.session_state['logged_in']:
         else ''
     )
     st.markdown(logo_html, unsafe_allow_html=True)
+
+    # Main Card Body Wrapper
+    st.markdown('<div style="background: #070b19; padding: 30px; border-radius: 0 0 16px 16px; border: 1px solid #1e222d; box-shadow: 0 25px 50px rgba(0, 0, 0, 0.9);">', unsafe_allow_html=True)
 
     if st.session_state['otp_required']:
         st.info(f"🔒 OTP security verification sent to: **{st.session_state['temp_email']}**")
