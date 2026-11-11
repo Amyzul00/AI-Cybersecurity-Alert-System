@@ -52,6 +52,18 @@ if 'temp_role' not in st.session_state:
 if 'temp_email' not in st.session_state:
     st.session_state['temp_email'] = ""
 
+
+def get_base64_image(image_path):
+    try:
+        with open(image_path, "rb") as img_file:
+            encoded = base64.b64encode(img_file.read()).decode()
+            return f"data:image/png;base64,{encoded}"
+    except Exception:
+        return ""
+
+
+logo_base64 = get_base64_image("Logo.png")
+
 # ==========================================
 # EMAIL NOTIFICATION FUNCTIONS (WELCOME & OTP 2FA)
 # ==========================================
@@ -82,12 +94,24 @@ def send_email_notification(receiver_email, subject, html_content):
 # VIEW 1: LOGIN, OTP & REGISTER PAGE
 # ==========================================
 if not st.session_state['logged_in']:
-    st.markdown("""
-        <div style="text-align: center; padding: 20px;">
-            <h1 style="color: #ff4b4b;">🛡️ Warisan Security Malware Operations</h1>
-            <p style="color: #8a99ad; font-size: 1.1rem;">Please Login, Enter OTP, or Register an Account to Access the AI Dashboard</p>
-        </div>
-    """, unsafe_allow_html=True)
+    if logo_base64:
+        st.markdown(
+            f"""
+            <div style="text-align: center; padding: 20px;">
+                <img src="{logo_base64}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 12px rgba(255, 75, 75, 0.4); margin-bottom: 10px;" alt="Logo">
+                <h1 style="color: #ff4b4b; margin: 0;">Warisan Security Malware Operations</h1>
+                <p style="color: #8a99ad; font-size: 1.1rem; margin-top: 5px;">Please Login, Enter OTP, or Register an Account to Access the AI Dashboard</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown("""
+            <div style="text-align: center; padding: 20px;">
+                <h1 style="color: #ff4b4b;">🛡️ Warisan Security Malware Operations</h1>
+                <p style="color: #8a99ad; font-size: 1.1rem;">Please Login, Enter OTP, or Register an Account to Access the AI Dashboard</p>
+            </div>
+        """, unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -219,17 +243,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-
-def get_base64_image(image_path):
-    try:
-        with open(image_path, "rb") as img_file:
-            encoded = base64.b64encode(img_file.read()).decode()
-            return f"data:image/png;base64,{encoded}"
-    except Exception:
-        return ""
-
-
-logo_base64 = get_base64_image("Logo.png")
 
 # ==========================================
 # 2. Header & Action Controls
