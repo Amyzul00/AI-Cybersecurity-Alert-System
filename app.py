@@ -86,6 +86,18 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+
+def get_base64_image(image_path):
+    try:
+        with open(image_path, "rb") as img_file:
+            encoded = base64.b64encode(img_file.read()).decode()
+            return f"data:image/png;base64,{encoded}"
+    except Exception:
+        return ""
+
+
+logo_base64 = get_base64_image("Logo.png")
+
 # ==========================================
 # EMAIL NOTIFICATION FUNCTIONS (WELCOME & OTP 2FA)
 # ==========================================
@@ -116,9 +128,16 @@ def send_email_notification(receiver_email, subject, html_content):
 # VIEW 1: LOGIN, OTP & REGISTER PAGE
 # ==========================================
 if not st.session_state['logged_in']:
-    st.markdown("""
+    logo_img_html = (
+        f'<img src="{logo_base64}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 10px rgba(0,0,0,0.5); margin-bottom: 10px;" alt="Logo">'
+        if logo_base64
+        else '<span style="font-size: 2.5rem;">🛡️</span>'
+    )
+
+    st.markdown(f"""
         <div style="text-align: center; padding: 10px 20px 20px 20px;">
-            <h1 style="color: #ff4b4b; font-size: 2.5rem; font-weight: 700; margin-bottom: 5px;">🛡️ Warisan Security Malware Operations</h1>
+            {logo_img_html}
+            <h1 style="color: #ff4b4b; font-size: 2.5rem; font-weight: 700; margin-bottom: 5px;">Warisan Security Malware Operations</h1>
             <p style="color: #8a99ad; font-size: 1.1rem;">Please Login, Enter OTP, or Register an Account to Access the AI Dashboard</p>
         </div>
     """, unsafe_allow_html=True)
@@ -254,18 +273,6 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
-
-
-def get_base64_image(image_path):
-    try:
-        with open(image_path, "rb") as img_file:
-            encoded = base64.b64encode(img_file.read()).decode()
-            return f"data:image/png;base64,{encoded}"
-    except Exception:
-        return ""
-
-
-logo_base64 = get_base64_image("Logo.png")
 
 # ==========================================
 # 2. Header & Action Controls
