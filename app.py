@@ -184,7 +184,7 @@ if not st.session_state['logged_in']:
                     else:
                         st.warning("Please fill in all fields.")
 
-            # --- REGISTER TAB (Professional Error Handlers) ---
+            # --- REGISTER TAB ---
             with tab_register:
                 st.subheader("Register New Account & Notifications")
                 reg_user = st.text_input("Choose Username", key="reg_username")
@@ -196,7 +196,7 @@ if not st.session_state['logged_in']:
                         try:
                             conn = get_db_connection()
                             cursor = conn.cursor()
-  cursor.execute(
+                            cursor.execute(
                                 "INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, ?)",
                                 (reg_user, reg_pass, reg_email, 'user')
                             )
@@ -224,17 +224,7 @@ if not st.session_state['logged_in']:
                             
                             st.success("Account successfully registered and notification email sent! Please switch to the 'Login' tab.")
                         except Exception as err:
-                            # Professional Error Handling for Duplicates (Error 1062)
-                            if err.errno == 1062:
-                                error_msg = str(err).lower()
-                                if 'username' in error_msg:
-                                    st.warning("⚠️ This username is already taken. Please choose a different username.")
-                                elif 'email' in error_msg:
-                                    st.warning("⚠️ This email address is already registered. Please use another email or log in.")
-                                else:
-                                    st.warning("⚠️ This account already exists. Please use a unique username and email.")
-                            else:
-                                st.error(f"Database error occurred: {err.msg}")
+                            st.error(f"Database error: {err}")
                     else:
                         st.warning("Please fill in all fields including email.")
 
