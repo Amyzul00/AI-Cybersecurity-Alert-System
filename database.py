@@ -33,7 +33,13 @@ def init_db():
         )
     ''')
 
-    # Updated table for user registration and login using 'password'
+    # Automatically check and migrate users table if old column exists
+    cursor.execute("PRAGMA table_info(users)")
+    columns = [col[1] for col in cursor.fetchall()]
+    if "hashed_password" in columns:
+        cursor.execute("DROP TABLE users")
+
+    # Table for user registration and login using 'password'
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
