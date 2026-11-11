@@ -834,11 +834,19 @@ with col_download:
         use_container_width=True,
     )
 
-    if st.button("📧 Email PDF Report to All Users", use_container_width=True):
-        with st.spinner("Broadcasting PDF report to all registered users..."):
-            sent_count = broadcast_pdf_report_to_all_users(pdf_buffer)
-            if sent_count > 0:
-                st.success(f"Successfully broadcasted report to {sent_count} registered user(s)!")
-                st.toast(f"✅ Executive PDF report emailed to {sent_count} users!", icon="📧")
-            else:
-                st.warning("No registered user email addresses found in the database.")
+    # --- RESTRICTED TO ADMIN ROLE ONLY ---
+    user_role = st.session_state.get('role', 'user').strip().lower()
+    
+    if user_role == 'admin':
+        st.markdown("---")
+        st.markdown("### 👑 Admin Controls")
+        if st.button("📧 Email PDF Report to All Users", use_container_width=True):
+            with st.spinner("Broadcasting PDF report to all registered users..."):
+                sent_count = broadcast_pdf_report_to_all_users(pdf_buffer)
+                if sent_count > 0:
+                    st.success(f"Successfully broadcasted report to {sent_count} registered user(s)!")
+                    st.toast(f"✅ Executive PDF report emailed to {sent_count} users!", icon="📧")
+                else:
+                    st.warning("No registered user email addresses found in the database.")
+    else:
+        st.caption("🔒 *Multi-user PDF broadcast is restricted to Administrator accounts.*")
