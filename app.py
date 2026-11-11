@@ -132,14 +132,14 @@ if not st.session_state['logged_in']:
                     if login_user and login_pass:
                         try:
                             conn = get_db_connection()
-                            cursor = conn.cursor(dictionary=True)
+                            cursor = conn.cursor()
                             cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?", (login_user, login_pass))
                             user = cursor.fetchone()
                             cursor.close()
                             conn.close()
                             
                             if user:
-                                user_email = user.get('email')
+                                user_email = user['email']
                                 if not user_email:
                                     st.error("Your account does not have a registered email address for OTP delivery.")
                                 else:
@@ -147,7 +147,7 @@ if not st.session_state['logged_in']:
                                     
                                     st.session_state['generated_otp'] = otp_code
                                     st.session_state['temp_username'] = user['username']
-                                    st.session_state['temp_role'] = user.get('role', 'user')
+                                    st.session_state['temp_role'] = user['role'] if 'role' in user else 'user'
                                     st.session_state['temp_email'] = user_email
                                     
                                     subject = "🔐 Login Verification OTP - Warisan Security Malware Operations"
