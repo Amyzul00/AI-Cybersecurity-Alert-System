@@ -23,19 +23,18 @@ from reportlab.platypus import (
     TableStyle,
 )
 import streamlit as st
-import mysql.connector
-
-# Import your backend threat detection engine functions
-import threat_detector
+from database import get_db_connection
+# ...
+conn = get_db_connection()
 
 # ==========================================
-# 0. Konfigurasi Sambungan MySQL & Session
+# 0. MySQL Connection & Session Configuration
 # ==========================================
 def get_db_connection():
     return mysql.connector.connect(
         host="localhost",
         user="root",
-        password="",  # Masukkan password MySQL anda jika ada
+        password="",  # Enter your MySQL password here if any
         database="cybersecurity_db"
     )
 
@@ -45,41 +44,37 @@ st.set_page_config(
     layout="wide",
 )
 
-# Inisialisasi Session State untuk Kawalan Akses Pengguna
+# Initialize Session State for Access Control & 2FA OTP
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 if 'username' not in st.session_state:
     st.session_state['username'] = ""
 if 'role' not in st.session_state:
     st.session_state['role'] = ""
+if 'otp_required' not in st.session_state:
+    st.session_state['otp_required'] = False
+if 'generated_otp' not in st.session_state:
+    st.session_state['generated_otp'] = ""
+if 'temp_username' not in st.session_state:
+    st.session_state['temp_username'] = ""
+if 'temp_role' not in st.session_state:
+    st.session_state['temp_role'] = ""
+if 'temp_email' not in st.session_state:
+    st.session_state['temp_email'] = ""
 
 # ==========================================
-# FUNGSI HANTAR E-MEL NOTIFIKASI PENDAFTARAN
+# EMAIL NOTIFICATION FUNCTIONS (WELCOME & OTP 2FA)
 # ==========================================
-def send_welcome_email(receiver_email, username):
+def send_email_notification(receiver_email, subject, html_content):
     sender_email = "sendermalwaree@gmail.com"
     app_password = "qldpqrxkfbeeqyhf"
     smtp_server = "smtp.gmail.com"
     port = 587
 
     message = MIMEMultipart()
-    message["Subject"] = "🛡️ Pendaftaran Berjaya - Warisan Security Malware Operations"
+    message["Subject"] = subject
     message["From"] = sender_email
     message["To"] = receiver_email
-
-    html_content = f"""
-      <html>
-        <body style="font-family: Arial, sans-serif; background-color: #121212; color: #ffffff; padding: 20px;">
-          <div style="max-width: 600px; margin: auto; background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #ff4b4b;">
-            <h2 style="color: #ff4b4b;">✨ Selamat Datang, {username}!</h2>
-            <p>Akaun anda untuk sistem <b>Warisan Security Malware Operations</b> telah berjaya didaftarkan.</p>
-            <p>Anda kini layak menerima amaran keselamatan automatik dan laporan analitik ancaman terus ke e-mel ini.</p>
-            <br>
-            <p style="font-size: 12px; color: #888;">Dijana secara automatik oleh Platform SOAR & AI Threat Detection UTP.</p>
-          </div>
-        </body>
-      </html>
-    """
     message.attach(MIMEText(html_content, "html"))
 
     try:
@@ -90,91 +85,175 @@ def send_welcome_email(receiver_email, username):
         server.quit()
         return True
     except Exception as e:
-        print(f"Gagal menghantar e-mel: {e}")
+        print(f"Failed to send email: {e}")
         return False
 
 # ==========================================
-# PAPARAN 1: HALAMAN LOGIN & REGISTER (JIKA BELUM LOG MASUK)
+# VIEW 1: LOGIN, OTP & REGISTER PAGE
 # ==========================================
 if not st.session_state['logged_in']:
     st.markdown("""
-        <div style="text-align: center; padding: 30px;">
+        <div style="text-align: center; padding: 20px;">
             <h1 style="color: #ff4b4b;">🛡️ Warisan Security Malware Operations</h1>
-            <p style="color: #8a99ad; font-size: 1.1rem;">Sila Log Masuk atau Daftar Akaun untuk Mengakses Papan Pemuka AI & Notifikasi Amaran</p>
+            <p style="color: #8a99ad; font-size: 1.1rem;">Please Login, Enter OTP, or Register an Account to Access the AI Dashboard</p>
         </div>
     """, unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        tab_login, tab_register = st.tabs(["🔑 Log Masuk (Login)", "📝 Daftar Akaun (Register)"])
-
-        # --- TAB LOGIN ---
-        with tab_login:
-            st.subheader("Log Masuk Sistem")
-            login_user = st.text_input("Username", key="login_username")
-            login_pass = st.text_input("Password", type="password", key="login_password")
+        # 2FA OTP Verification Screen
+        if st.session_state['otp_required']:
+            st.info(f"🔒 A security verification code (OTP) has been sent to your email: **{st.session_state['temp_email']}**")
+            st.subheader("Enter 6-Digit OTP Code")
             
-            if st.button("Masuk ke Dashboard", use_container_width=True):
-                if login_user and login_pass:
-                    try:
-                        conn = get_db_connection()
-                        cursor = conn.cursor(dictionary=True)
-                        cursor.execute("SELECT * FROM users WHERE username = %s AND password = %s", (login_user, login_pass))
-                        user = cursor.fetchone()
-                        cursor.close()
-                        conn.close()
-                        
-                        if user:
-                            st.session_state['logged_in'] = True
-                            st.session_state['username'] = user['username']
-                            st.session_state['role'] = user['role']
-                            st.success("Log masuk berjaya! Memuatkan dashboard...")
-                            time.sleep(1)
-                            st.rerun()
-                        else:
-                            st.error("Username atau Password salah!")
-                    except Exception as e:
-                        st.error(f"Ralat pangkalan data: {e}")
-                else:
-                    st.warning("Sila isi semua ruangan.")
-
-        # --- TAB REGISTER (DENGAN E-MEL & NOTIFIKASI) ---
-        with tab_register:
-            st.subheader("Daftar Akaun Baru & Notifikasi")
-            reg_user = st.text_input("Pilih Username", key="reg_username")
-            reg_email = st.text_input("Alamat E-mel (Untuk Notifikasi)", key="reg_email")
-            reg_pass = st.text_input("Pilih Password", type="password", key="reg_password")
+            entered_otp = st.text_input("Enter OTP Code", type="password", key="otp_input")
             
-            if st.button("Daftar Sekarang", use_container_width=True):
-                if reg_user and reg_email and reg_pass:
-                    try:
-                        conn = get_db_connection()
-                        cursor = conn.cursor()
-                        # Masukkan username, password, email dan role ke MySQL
-                        cursor.execute(
-                            "INSERT INTO users (username, password, email, role) VALUES (%s, %s, %s, %s)", 
-                            (reg_user, reg_pass, reg_email, 'user')
-                        )
-                        conn.commit()
-                        cursor.close()
-                        conn.close()
+            c_otp1, c_otp2 = st.columns(2)
+            with c_otp1:
+                if st.button("Verify & Login", use_container_width=True):
+                    if entered_otp == st.session_state['generated_otp']:
+                        st.session_state['logged_in'] = True
+                        st.session_state['username'] = st.session_state['temp_username']
+                        st.session_state['role'] = st.session_state['temp_role']
                         
-                        # Hantar e-mel notifikasi pendaftaran berjaya secara automatik
-                        with st.spinner("Menghantar e-mel pengesahan & notifikasi..."):
-                            send_welcome_email(reg_email, reg_user)
+                        st.session_state['otp_required'] = False
+                        st.session_state['generated_otp'] = ""
                         
-                        st.success("Akaun berjaya didaftar dan e-mel notifikasi telah dihantar! Sila beralih ke tab 'Log Masuk'.")
-                    except mysql.connector.Error as err:
-                        st.error(f"Ralat pangkalan data (Username atau e-mel mungkin telah wujud): {err}")
-                else:
-                    st.warning("Sila isi semua ruangan termasuk e-mel.")
+                        st.success("OTP verification successful! Loading dashboard...")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("Incorrect OTP code. Please check your email.")
+            with c_otp2:
+                if st.button("Cancel", use_container_width=True):
+                    st.session_state['otp_required'] = False
+                    st.rerun()
 
-    # Hentikan paparan di sini jika pengguna belum log masuk
+        else:
+            tab_login, tab_register = st.tabs(["🔑 Login", "📝 Register Account"])
+
+            # --- LOGIN TAB ---
+            with tab_login:
+                st.subheader("System Login (2FA Security)")
+                login_user = st.text_input("Username", key="login_username")
+                login_pass = st.text_input("Password", type="password", key="login_password")
+                
+                if st.button("Proceed to OTP Verification", use_container_width=True):
+                    if login_user and login_pass:
+                        try:
+                            conn = get_db_connection()
+                            cursor = conn.cursor(dictionary=True)
+                            cursor.execute("SELECT * FROM users WHERE username = %s AND password = %s", (login_user, login_pass))
+                            user = cursor.fetchone()
+                            cursor.close()
+                            conn.close()
+                            
+                            if user:
+                                user_email = user.get('email')
+                                if not user_email:
+                                    st.error("Your account does not have a registered email address for OTP delivery.")
+                                else:
+                                    otp_code = str(random.randint(100000, 999999))
+                                    
+                                    st.session_state['generated_otp'] = otp_code
+                                    st.session_state['temp_username'] = user['username']
+                                    st.session_state['temp_role'] = user.get('role', 'user')
+                                    st.session_state['temp_email'] = user_email
+                                    
+                                    subject = "🔐 Login Verification OTP - Warisan Security Malware Operations"
+                                    html_body = f"""
+                                      <html>
+                                        <body style="font-family: Arial, sans-serif; background-color: #121212; color: #ffffff; padding: 20px;">
+                                          <div style="max-width: 600px; margin: auto; background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #ff4b4b;">
+                                            <h2 style="color: #ff4b4b;">2FA Login Verification</h2>
+                                            <p>Hello <b>{user['username']}</b>,</p>
+                                            <p>Your verification code (OTP) to access the system is:</p>
+                                            <h1 style="color: #4CAF50; letter-spacing: 5px;">{otp_code}</h1>
+                                            <p>Please enter this code in the application interface to proceed.</p>
+                                            <br>
+                                            <p style="font-size: 12px; color: #888;">If you did not request this code, please ignore this email.</p>
+                                          </div>
+                                        </body>
+                                      </html>
+                                    """
+                                    
+                                    with st.spinner("Sending OTP code to your email..."):
+                                        email_sent = send_email_notification(user_email, subject, html_body)
+                                    
+                                    if email_sent:
+                                        st.session_state['otp_required'] = True
+                                        st.success("Password verified! Please check your email for the OTP code.")
+                                        time.sleep(1)
+                                        st.rerun()
+                                    else:
+                                        st.error("Failed to send OTP email. Please check internet connection or SMTP settings.")
+                            else:
+                                st.error("Incorrect Username or Password!")
+                        except Exception as e:
+                            st.error(f"Database error: {e}")
+                    else:
+                        st.warning("Please fill in all fields.")
+
+            # --- REGISTER TAB (Professional Error Handlers) ---
+            with tab_register:
+                st.subheader("Register New Account & Notifications")
+                reg_user = st.text_input("Choose Username", key="reg_username")
+                reg_email = st.text_input("Email Address (For Notifications & OTP)", key="reg_email")
+                reg_pass = st.text_input("Choose Password", type="password", key="reg_password")
+                
+                if st.button("Register Now", use_container_width=True):
+                    if reg_user and reg_email and reg_pass:
+                        try:
+                            conn = get_db_connection()
+                            cursor = conn.cursor()
+                            cursor.execute(
+                                "INSERT INTO users (username, password, email, role) VALUES (%s, %s, %s, %s)", 
+                                (reg_user, reg_pass, reg_email, 'user')
+                            )
+                            conn.commit()
+                            cursor.close()
+                            conn.close()
+                            
+                            welcome_subject = "🛡️ Registration Successful - Warisan Security Malware Operations"
+                            welcome_body = f"""
+                              <html>
+                                <body style="font-family: Arial, sans-serif; background-color: #121212; color: #ffffff; padding: 20px;">
+                                  <div style="max-width: 600px; margin: auto; background: #1e1e1e; padding: 20px; border-radius: 8px; border: 1px solid #ff4b4b;">
+                                    <h2 style="color: #ff4b4b;">✨ Welcome, {reg_user}!</h2>
+                                    <p>Your account for the <b>Warisan Security Malware Operations</b> system has been successfully registered.</p>
+                                    <p>You can now log in using email OTP authentication to access the threat dashboard.</p>
+                                    <br>
+                                    <p style="font-size: 12px; color: #888;">Generated automatically by UTP SOAR & AI Threat Detection Platform.</p>
+                                  </div>
+                                </body>
+                              </html>
+                            """
+                            
+                            with st.spinner("Sending registration confirmation email..."):
+                                send_email_notification(reg_email, welcome_subject, welcome_body)
+                            
+                            st.success("Account successfully registered and notification email sent! Please switch to the 'Login' tab.")
+                        except mysql.connector.Error as err:
+                            # Professional Error Handling for Duplicates (Error 1062)
+                            if err.errno == 1062:
+                                error_msg = str(err).lower()
+                                if 'username' in error_msg:
+                                    st.warning("⚠️ This username is already taken. Please choose a different username.")
+                                elif 'email' in error_msg:
+                                    st.warning("⚠️ This email address is already registered. Please use another email or log in.")
+                                else:
+                                    st.warning("⚠️ This account already exists. Please use a unique username and email.")
+                            else:
+                                st.error(f"Database error occurred: {err.msg}")
+                    else:
+                        st.warning("Please fill in all fields including email.")
+
+    # Stop execution here if user is not logged in
     st.stop()
 
 
 # ==========================================
-# PAPARAN 2: DASHBOARD UTAMA (SELEPAS BERJAYA LOGIN)
+# VIEW 2: MAIN DASHBOARD (AFTER SUCCESSFUL LOGIN & OTP)
 # ==========================================
 st.markdown(
     """
@@ -515,7 +594,7 @@ def send_pdf_report_email(pdf_buffer, receiver_email="justmeameyzul@gmail.com"):
 
 
 # ==========================================
-# 6. Sidebar Filtering, User Session & Notifikasi
+# 6. Sidebar Filtering, User Session & Notifications
 # ==========================================
 if logo_base64:
     st.sidebar.markdown(
@@ -527,10 +606,10 @@ else:
         "https://img.icons8.com/color/96/000000/cyber-security.png", width=80
     )
 
-# Maklumat Akaun Pengguna yang Sedang Log Masuk
-st.sidebar.success(f"👤 Pengguna: **{st.session_state['username']}**\n\n🔑 Peranan: **{st.session_state['role'].upper()}**")
+# Logged-in User Account Info
+st.sidebar.success(f"👤 User: **{st.session_state['username']}**\n\n🔑 Role: **{st.session_state['role'].upper()}**")
 
-if st.sidebar.button("🚪 Log Keluar (Logout)", use_container_width=True):
+if st.sidebar.button("🚪 Logout", use_container_width=True):
     st.session_state['logged_in'] = False
     st.session_state['username'] = ""
     st.session_state['role'] = ""
@@ -538,10 +617,10 @@ if st.sidebar.button("🚪 Log Keluar (Logout)", use_container_width=True):
 
 st.sidebar.divider()
 
-# Pusat Notifikasi Pengguna
-st.sidebar.subheader("🔔 Pusat Notifikasi & Amaran")
-st.sidebar.info("📩 Status Langganan Notifikasi: **Aktif (Peti Masuk & E-mel)**")
-st.sidebar.warning("⚠️ 2 Amaran Kritikal (DDoS/Botnet) baru dikesan untuk akaun anda.")
+# User Notification Center
+st.sidebar.subheader("🔔 Notification & Alert Center")
+st.sidebar.info("📩 Notification Subscription Status: **Active (Inbox & 2FA Email)**")
+st.sidebar.warning("⚠️ 2 Critical Alerts (DDoS/Botnet) newly detected for your account.")
 
 st.sidebar.divider()
 st.sidebar.header("Filter & Controls")
