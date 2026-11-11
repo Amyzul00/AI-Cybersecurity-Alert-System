@@ -33,20 +33,7 @@ def init_db():
         )
     ''')
 
-    # Automatically check if users table exists and has the 'password' column
-    cursor.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='users'"
-    )
-    table_exists = cursor.fetchone()
-
-    if table_exists:
-        cursor.execute("PRAGMA table_info(users)")
-        columns = [col[1] for col in cursor.fetchall()]
-        # If the table exists but lacks 'password' (or has old schema), drop it to recreate
-        if "password" not in columns:
-            cursor.execute("DROP TABLE users")
-
-    # Table for user registration and login using 'password'
+    # Ensure users table exists
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,6 +44,25 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+
+    # Check columns and add 'password' if missing from older schema
+    cursor.execute("PRAGMA table_info(users)")
+    columns = [col[1] for col in cursor.fetchall()]
+    if "password" not in columns:
+        try:
+            cursor.execute("ALTER TABLE users ADD COLUMN password TEXT NOT NULL DEFAULT ''")
+        except Exception:
+            cursor.execute("DROP TABLE IF EXISTS users")
+            cursor.execute('''
+                CREATE TABLE users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT NOT NULL UNIQUE,
+                    email TEXT NOT NULL UNIQUE,
+                    password TEXT NOT NULL,
+                    role TEXT NOT NULL DEFAULT 'analyst',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
 
     conn.commit()
     conn.close()
@@ -88,11 +94,6 @@ def log_threat(
 
         conn.commit()
         conn.close()
-
-        print(
-            f"[ALERT LOGGED] {timestamp} | {src_ip} -> {dst_ip} | "
-            f"{threat_type} ({severity}) | Score: {confidence_score:.2f}"
-        )
 
     except Exception as e:
         print(f"[-] Database insertion error: {e}")
