@@ -1,10 +1,11 @@
 from alerts import send_security_alert_to_all
 from database import (
     get_db_connection,
+    init_db,
+    log_threat,
+    fetch_recent_threats,
     register_user,
     get_all_registered_users,
-    create_users_table,
-    fetch_recent_threats,
 )
 import base64
 from datetime import datetime
@@ -200,11 +201,11 @@ if not st.session_state["logged_in"]:
                 
                 if st.button("Register Now", use_container_width=True):
                     if reg_user and reg_email and reg_pass:
-                        try:
-                            register_user(reg_user, reg_pass, reg_email, "user")
+                        success = register_user(reg_user, reg_email, reg_pass, "user")
+                        if success:
                             st.success("Account successfully registered! Please switch to the 'Login' tab.")
-                        except Exception as err:
-                            st.error(f"Database error: {err}")
+                        else:
+                            st.error("Registration failed. Username or email may already exist.")
                     else:
                         st.warning("Please fill in all fields including email.")
 
@@ -500,25 +501,7 @@ def broadcast_pdf_report_to_all_users(pdf_buffer):
     port = 587
 
     try:
-        registered_users = get_all_registered_users() if 'get_all_registered_users' in globals() else []
-        
-        recipient_emails = []
-        if registered_users:
-            for u in registered_users:
-                if isinstance(u, dict) and u.get('email'):
-                    recipient_emails.append(u['email'])
-                elif isinstance(u, (list, tuple)) and len(u) > 2:
-                    recipient_emails.append(u[2])
-        
-        if not recipient_emails:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT email FROM users WHERE email IS NOT NULL AND email != ''")
-            users = cursor.fetchall()
-            cursor.close()
-            conn.close()
-            recipient_emails = [row['email'] for row in users]
-
+        recipient_emails = get_all_registered_users()
         if not recipient_emails:
             return 0
 
@@ -604,19 +587,22 @@ st.sidebar.subheader("🚨 Notification & Alert Center")
 
 recent_threats = fetch_recent_threats(limit=10)
 
-for threat in recent_threats:
-    threat_id = threat["id"]
-    src_ip = threat["src_ip"]
-    threat_type = threat["threat_type"]
-    severity = threat["severity"]
-    
-    if severity.lower() in ["high", "critical"]:
-        alert_flag_key = f"email_sent_threat_{threat_id}"
+if recent_threats:
+    for threat in recent_threats:
+        threat_id = threat["id"]
+        src_ip = threat["src_ip"]
+        threat_type = threat["threat_type"]
+        severity = threat["severity"]
         
-        if not st.session_state.get(alert_flag_key, False):
-            send_security_alert_to_all(src_ip, threat_type)
-            st.session_state[alert_flag_key] = True
-            st.sidebar.success(f"Alert email broadcasted for Threat ID #{threat_id}!")
+        if severity.lower() in ["high", "critical"]:
+            alert_flag_key = f"email_sent_threat_{threat_id}"
+            
+            if not st.session_state.get(alert_flag_key, False):
+                send_security_alert_to_all(src_ip, threat_type)
+                st.session_state[alert_flag_key] = True
+                st.sidebar.success(f"Alert email broadcasted for Threat ID #{threat_id}!")
+else:
+    st.sidebar.caption("No recent threat alerts logged yet.")
 
 st.sidebar.divider()
 st.sidebar.header("Filter & Controls")
