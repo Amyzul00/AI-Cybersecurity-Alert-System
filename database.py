@@ -60,6 +60,11 @@ def init_db():
         ''')
 
     conn.commit()
+
+    # Automatically force admin role for the official alert email on every initialization
+    cursor.execute("UPDATE users SET role = 'admin' WHERE email = 'warisansecurityalerts@gmail.com'")
+    conn.commit()
+
     conn.close()
     print(f"[+] Database initialized successfully: {DB_NAME}")
 
