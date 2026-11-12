@@ -2,19 +2,20 @@ import sqlite3
 import datetime
 import os
 
+# Define robust absolute database path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_NAME = os.path.join(BASE_DIR, "threat_logs.db")
 
 
 def get_db_connection():
-    """Create a connection to the SQLite database."""
+    """Create a connection to the SQLite database with row factory enabled."""
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     return conn
 
 
 def init_db():
-    """Initialize threat logs and user tables with robust schema validation."""
+    """Initialize threat logs and user tables with robust schema validation and auto-migration."""
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -122,11 +123,11 @@ def get_all_registered_users() -> list[str]:
     """Fetch a list of all registered user emails for alert broadcasts."""
     conn = get_db_connection()
     try:
-        rows = conn.execute("SELECT email FROM users").fetchall()
+        rows = conn.execute("SELECT email FROM users WHERE email IS NOT NULL AND email != ''").fetchall()
         return [row["email"] for row in rows]
     finally:
         conn.close()
 
 
-# Automatically initialize and validate database on startup
+# Automatically initialize and validate database on module import
 init_db()
