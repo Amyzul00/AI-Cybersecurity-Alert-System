@@ -102,5 +102,31 @@ def fetch_recent_threats(limit=50):
         conn.close()
 
 
+def register_user(username: str, email: str, password: str, role: str = "user") -> bool:
+    """Register a new user into the database. Returns True if successful, False if duplicate."""
+    conn = get_db_connection()
+    try:
+        conn.execute(
+            "INSERT INTO users (username, email, role, password) VALUES (?, ?, ?, ?)",
+            (username.strip(), email.strip().lower(), role, password)
+        )
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
+
+
+def get_all_registered_users() -> list[str]:
+    """Fetch a list of all registered user emails for alert broadcasts."""
+    conn = get_db_connection()
+    try:
+        rows = conn.execute("SELECT email FROM users").fetchall()
+        return [row["email"] for row in rows]
+    finally:
+        conn.close()
+
+
 # Automatically initialize and validate database on startup
 init_db()

@@ -7,7 +7,6 @@ import time
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from log_integration import handle_security_event
 from PIL import Image
 import pandas as pd
 import plotly.express as px
@@ -23,20 +22,32 @@ from reportlab.platypus import (
     TableStyle,
 )
 import streamlit as st
-from database import get_db_connection
 
+# Import custom backend modules
+from alerts import send_security_alert_to_all
+from database import (
+    create_users_table,
+    get_all_registered_users,
+    get_db_connection,
+    register_user,
+    fetch_recent_threats
+)
+from log_integration import handle_security_event
+
+# --- PAGE CONFIGURATION ---
 st.set_page_config(
     page_title="Warisan Security Malware Operations - AI Threat Detection",
     page_icon="Logo.png",
     layout="wide",
 )
 
-# Initialize database connection using the shared SQLite helper
-conn = get_db_connection()
+# --- GLOBAL SESSION STATE INITIALIZATION ---
+if "user_email" not in st.session_state:
+    st.session_state["user_email"] = None
 
-# Initialize Session State for Access Control & 2FA OTP
-if 'logged_in' not in st.session_state:
-    st.session_state['logged_in'] = False
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+
 if 'username' not in st.session_state:
     st.session_state['username'] = ""
 if 'role' not in st.session_state:
@@ -125,6 +136,7 @@ if not st.session_state['logged_in']:
                         st.session_state['logged_in'] = True
                         st.session_state['username'] = st.session_state['temp_username']
                         st.session_state['role'] = st.session_state['temp_role']
+                        st.session_state['user_email'] = st.session_state['temp_email']
                         
                         st.session_state['otp_required'] = False
                         st.session_state['generated_otp'] = ""
@@ -583,24 +595,29 @@ if st.sidebar.button("🚪 Logout", use_container_width=True):
     st.session_state['logged_in'] = False
     st.session_state['username'] = ""
     st.session_state['role'] = ""
+    st.session_state['user_email'] = None
     st.rerun()
 
 st.sidebar.divider()
 
-st.sidebar.subheader("🔔 Notification & Alert Center")
-st.sidebar.markdown(
-    """
-    <div style="background-color: #121926; border: 1px solid #1e293b; border-radius: 8px; padding: 12px; margin-bottom: 10px;">
-        <p style="margin: 0; font-size: 0.9rem; color: #94a3b8;">📥 Notification Subscription Status:</p>
-        <p style="margin: 4px 0 0 0; font-size: 0.95rem; color: #ffffff; font-weight: bold;">Active (Inbox & 2FA Email)</p>
-    </div>
+# --- NOTIFICATION & ALERT CENTER (FROM STEP 2) ---
+st.sidebar.subheader("🚨 Notification & Alert Center")
+
+recent_threats = fetch_recent_threats(limit=10)
+
+for threat in recent_threats:
+    threat_id = threat["id"]
+    src_ip = threat["src_ip"]
+    threat_type = threat["threat_type"]
+    severity = threat["severity"]
     
-    <div style="background-color: #261e0d; border: 1px solid #4d380f; border-radius: 8px; padding: 12px; margin-bottom: 15px;">
-        <p style="margin: 0; font-size: 0.9rem; color: #f6e05e;">⚠️ <b>2 Critical Alerts (DDoS/Botnet)</b> newly detected for your account.</p>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+    if severity.lower() in ["high", "critical"]:
+        alert_flag_key = f"email_sent_threat_{threat_id}"
+        
+        if not st.session_state.get(alert_flag_key, False):
+            send_security_alert_to_all(src_ip, threat_type)
+            st.session_state[alert_flag_key] = True
+            st.sidebar.success(f"Alert email broadcasted for Threat ID #{threat_id}!")
 
 st.sidebar.divider()
 st.sidebar.header("Filter & Controls")

@@ -1,4 +1,3 @@
-
 import os
 import jwt
 import sqlite3
@@ -69,7 +68,7 @@ def register(data: RegisterRequest):
     try:
         conn.execute(
             """
-            INSERT INTO users (username, email, hashed_password)
+            INSERT INTO users (username, email, password)
             VALUES (?, ?, ?)
             """,
             (username, email, hashed_password),
@@ -98,7 +97,7 @@ def login(data: LoginRequest):
     try:
         user = conn.execute(
             """
-            SELECT id, username, email, hashed_password, role
+            SELECT id, username, email, password, role
             FROM users
             WHERE username = ? COLLATE NOCASE
                OR email = ? COLLATE NOCASE
@@ -109,7 +108,7 @@ def login(data: LoginRequest):
         conn.close()
 
     if not user or not password_hash.verify(
-        data.password, user["hashed_password"]
+        data.password, user["password"]
     ):
         raise HTTPException(
             status_code=401,
