@@ -23,14 +23,14 @@ from reportlab.platypus import (
 )
 import streamlit as st
 
-# Import custom backend modules including register_user & get_all_registered_users
+# --- EXACT REQUESTED IMPORTS ---
 from alerts import send_security_alert_to_all
 from database import (
-    create_users_table,
-    get_all_registered_users,
     get_db_connection,
     register_user,
-    fetch_recent_threats
+    get_all_registered_users,
+    create_users_table,
+    fetch_recent_threats,
 )
 from log_integration import handle_security_event
 
@@ -48,20 +48,20 @@ if "user_email" not in st.session_state:
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 
-if 'username' not in st.session_state:
-    st.session_state['username'] = ""
-if 'role' not in st.session_state:
-    st.session_state['role'] = ""
-if 'otp_required' not in st.session_state:
-    st.session_state['otp_required'] = False
-if 'generated_otp' not in st.session_state:
-    st.session_state['generated_otp'] = ""
-if 'temp_username' not in st.session_state:
-    st.session_state['temp_username'] = ""
-if 'temp_role' not in st.session_state:
-    st.session_state['temp_role'] = ""
-if 'temp_email' not in st.session_state:
-    st.session_state['temp_email'] = ""
+if "username" not in st.session_state:
+    st.session_state["username"] = ""
+if "role" not in st.session_state:
+    st.session_state["role"] = ""
+if "otp_required" not in st.session_state:
+    st.session_state["otp_required"] = False
+if "generated_otp" not in st.session_state:
+    st.session_state["generated_otp"] = ""
+if "temp_username" not in st.session_state:
+    st.session_state["temp_username"] = ""
+if "temp_role" not in st.session_state:
+    st.session_state["temp_role"] = ""
+if "temp_email" not in st.session_state:
+    st.session_state["temp_email"] = ""
 
 # ==========================================
 # HELPER: BASE64 IMAGE ENCODING
@@ -105,7 +105,7 @@ def send_email_notification(receiver_email, subject, html_content):
 # ==========================================
 # VIEW 1: LOGIN, OTP & REGISTER PAGE
 # ==========================================
-if not st.session_state['logged_in']:
+if not st.session_state["logged_in"]:
     logo_html = f'<img src="{logo_base64}" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 10px rgba(0,0,0,0.5); margin-bottom: 12px;" alt="Logo">' if logo_base64 else '<span style="font-size: 3rem;">🛡️</span>'
 
     st.markdown(f"""
@@ -119,7 +119,7 @@ if not st.session_state['logged_in']:
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         # 2FA OTP Verification Screen
-        if st.session_state['otp_required']:
+        if st.session_state["otp_required"]:
             st.info(f"🔒 A security verification code (OTP) has been generated for: **{st.session_state['temp_email']}**")
             
             # --- ON-SCREEN CLOUD BYPASS DEBUG BANNER ---
@@ -132,14 +132,14 @@ if not st.session_state['logged_in']:
             c_otp1, c_otp2 = st.columns(2)
             with c_otp1:
                 if st.button("Verify & Login", use_container_width=True):
-                    if entered_otp == st.session_state['generated_otp']:
-                        st.session_state['logged_in'] = True
-                        st.session_state['username'] = st.session_state['temp_username']
-                        st.session_state['role'] = st.session_state['temp_role']
-                        st.session_state['user_email'] = st.session_state['temp_email']
+                    if entered_otp == st.session_state["generated_otp"]:
+                        st.session_state["logged_in"] = True
+                        st.session_state["username"] = st.session_state["temp_username"]
+                        st.session_state["role"] = st.session_state["temp_role"]
+                        st.session_state["user_email"] = st.session_state["temp_email"]
                         
-                        st.session_state['otp_required'] = False
-                        st.session_state['generated_otp'] = ""
+                        st.session_state["otp_required"] = False
+                        st.session_state["generated_otp"] = ""
                         
                         st.success("OTP verification successful! Loading dashboard...")
                         time.sleep(1)
@@ -148,7 +148,7 @@ if not st.session_state['logged_in']:
                         st.error("Incorrect OTP code. Please check the debug code shown above.")
             with c_otp2:
                 if st.button("Cancel", use_container_width=True):
-                    st.session_state['otp_required'] = False
+                    st.session_state["otp_required"] = False
                     st.rerun()
 
         else:
@@ -171,18 +171,18 @@ if not st.session_state['logged_in']:
                             conn.close()
                             
                             if user:
-                                user_email = user['email']
+                                user_email = user["email"]
                                 if not user_email:
                                     st.error("Your account does not have a registered email address.")
                                 else:
                                     otp_code = str(random.randint(100000, 999999))
                                     
-                                    st.session_state['generated_otp'] = otp_code
-                                    st.session_state['temp_username'] = user['username']
-                                    st.session_state['temp_role'] = user['role'] if 'role' in user else 'user'
-                                    st.session_state['temp_email'] = user_email
+                                    st.session_state["generated_otp"] = otp_code
+                                    st.session_state["temp_username"] = user["username"]
+                                    st.session_state["temp_role"] = user["role"] if "role" in user else "user"
+                                    st.session_state["temp_email"] = user_email
                                     
-                                    st.session_state['otp_required'] = True
+                                    st.session_state["otp_required"] = True
                                     st.success("Credentials verified! OTP generated successfully.")
                                     time.sleep(0.5)
                                     st.rerun()
@@ -203,15 +203,13 @@ if not st.session_state['logged_in']:
                 if st.button("Register Now", use_container_width=True):
                     if reg_user and reg_email and reg_pass:
                         try:
-                            # Using register_user helper from database module
-                            register_user(reg_user, reg_pass, reg_email, 'user')
+                            register_user(reg_user, reg_pass, reg_email, "user")
                             st.success("Account successfully registered! Please switch to the 'Login' tab.")
                         except Exception as err:
                             st.error(f"Database error: {err}")
                     else:
                         st.warning("Please fill in all fields including email.")
 
-    # Stop execution here if user is not logged in
     st.stop()
 
 
@@ -504,17 +502,15 @@ def broadcast_pdf_report_to_all_users(pdf_buffer):
     port = 587
 
     try:
-        # Using get_all_registered_users or direct query via get_db_connection
         registered_users = get_all_registered_users() if 'get_all_registered_users' in globals() else []
         
         recipient_emails = []
         if registered_users:
             for u in registered_users:
-                # Handle tuple/dict return formats from different database helpers
                 if isinstance(u, dict) and u.get('email'):
                     recipient_emails.append(u['email'])
                 elif isinstance(u, (list, tuple)) and len(u) > 2:
-                    recipient_emails.append(u[2]) # Assuming index 2 is email
+                    recipient_emails.append(u[2])
         
         if not recipient_emails:
             conn = get_db_connection()
@@ -597,10 +593,10 @@ st.sidebar.markdown(
 )
 
 if st.sidebar.button("🚪 Logout", use_container_width=True):
-    st.session_state['logged_in'] = False
-    st.session_state['username'] = ""
-    st.session_state['role'] = ""
-    st.session_state['user_email'] = None
+    st.session_state["logged_in"] = False
+    st.session_state["username"] = ""
+    st.session_state["role"] = ""
+    st.session_state["user_email"] = None
     st.rerun()
 
 st.sidebar.divider()
