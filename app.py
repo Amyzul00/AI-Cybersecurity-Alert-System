@@ -76,6 +76,13 @@ def get_base64_image(image_path):
 logo_base64 = get_base64_image("Logo.png")
 
 # ==========================================
+# PASSWORD VERIFICATION HELPER
+# ==========================================
+def verify_password(plain_password, stored_password):
+    """Verify plain password against stored database password."""
+    return plain_password == stored_password
+
+# ==========================================
 # EMAIL NOTIFICATION FUNCTIONS (WELCOME & OTP 2FA)
 # ==========================================
 def send_email_notification(receiver_email, subject, html_content):
@@ -135,7 +142,12 @@ if not st.session_state["logged_in"]:
                         st.session_state["logged_in"] = True
                         st.session_state["username"] = st.session_state["temp_username"]
                         st.session_state["role"] = st.session_state["temp_role"]
+                        st.session_state["email"] = st.session_state["temp_email"]
                         st.session_state["user_email"] = st.session_state["temp_email"]
+                        
+                        # Admin Role Override Check
+                        if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
+                            st.session_state.role = "admin"
                         
                         st.session_state["otp_required"] = False
                         st.session_state["generated_otp"] = ""
@@ -156,29 +168,29 @@ if not st.session_state["logged_in"]:
             # --- LOGIN TAB ---
             with tab_login:
                 st.subheader("System Login (2FA Security)")
-                login_user = st.text_input("Username", key="login_username")
-                login_pass = st.text_input("Password", type="password", key="login_password")
+                username_or_email = st.text_input("Username or Email", key="login_username_or_email")
+                password = st.text_input("Password", type="password", key="login_password")
                 
                 if st.button("Proceed to OTP Verification", use_container_width=True):
-                    if login_user and login_pass:
+                    if username_or_email and password:
                         try:
                             conn = get_db_connection()
-                            cursor = conn.cursor()
-                            cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?", (login_user, login_pass))
-                            user = cursor.fetchone()
-                            cursor.close()
+                            user_record = conn.execute(
+                                "SELECT * FROM users WHERE username = ? OR email = ?", 
+                                (username_or_email, username_or_email)
+                            ).fetchone()
                             conn.close()
                             
-                            if user:
-                                user_email = user["email"]
+                            if user_record and verify_password(password, user_record["password"]):
+                                user_email = user_record["email"]
                                 if not user_email:
                                     st.error("Your account does not have a registered email address.")
                                 else:
                                     otp_code = str(random.randint(100000, 999999))
                                     
                                     st.session_state["generated_otp"] = otp_code
-                                    st.session_state["temp_username"] = user["username"]
-                                    st.session_state["temp_role"] = user["role"] if "role" in user else "user"
+                                    st.session_state["temp_username"] = user_record["username"]
+                                    st.session_state["temp_role"] = user_record["role"].upper()
                                     st.session_state["temp_email"] = user_email
                                     
                                     st.session_state["otp_required"] = True
@@ -186,7 +198,7 @@ if not st.session_state["logged_in"]:
                                     time.sleep(0.5)
                                     st.rerun()
                             else:
-                                st.error("Incorrect Username or Password!")
+                                st.error("Incorrect Username/Email or Password!")
                         except Exception as e:
                             st.error(f"Database error: {e}")
                     else:
@@ -235,6 +247,10 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
+
+# Sidebar Admin Role Check Override
+if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
+    st.session_state.role = "admin"
 
 # ==========================================
 # 2. Header & Action Controls
@@ -577,6 +593,7 @@ if st.sidebar.button("🚪 Logout", use_container_width=True):
     st.session_state["logged_in"] = False
     st.session_state["username"] = ""
     st.session_state["role"] = ""
+    st.session_state["email"] = None
     st.session_state["user_email"] = None
     st.rerun()
 
