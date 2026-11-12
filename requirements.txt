@@ -7,3 +7,4 @@ scapy
 mysql-connector-python
 reportlab
 joblib
+plyer
