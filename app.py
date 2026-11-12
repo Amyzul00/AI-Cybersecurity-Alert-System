@@ -53,6 +53,19 @@ if 'temp_email' not in st.session_state:
     st.session_state['temp_email'] = ""
 
 # ==========================================
+# HELPER: BASE64 IMAGE ENCODING
+# ==========================================
+def get_base64_image(image_path):
+    try:
+        with open(image_path, "rb") as img_file:
+            encoded = base64.b64encode(img_file.read()).decode()
+            return f"data:image/png;base64,{encoded}"
+    except Exception:
+        return ""
+
+logo_base64 = get_base64_image("Logo.png")
+
+# ==========================================
 # EMAIL NOTIFICATION FUNCTIONS (WELCOME & OTP 2FA)
 # ==========================================
 def send_email_notification(receiver_email, subject, html_content):
@@ -82,10 +95,13 @@ def send_email_notification(receiver_email, subject, html_content):
 # VIEW 1: LOGIN, OTP & REGISTER PAGE
 # ==========================================
 if not st.session_state['logged_in']:
-    st.markdown("""
+    logo_html = f'<img src="{logo_base64}" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 10px rgba(0,0,0,0.5); margin-bottom: 12px;" alt="Logo">' if logo_base64 else '<span style="font-size: 3rem;">🛡️</span>'
+
+    st.markdown(f"""
         <div style="text-align: center; padding: 20px;">
-            <h1 style="color: #ff4b4b;">🛡️ Warisan Security Malware Operations</h1>
-            <p style="color: #8a99ad; font-size: 1.1rem;">Please Login, Enter OTP, or Register an Account to Access the AI Dashboard</p>
+            {logo_html}
+            <h1 style="color: #ff4b4b; margin: 0;">Warisan Security Malware Operations</h1>
+            <p style="color: #8a99ad; font-size: 1.1rem; margin-top: 5px;">Please Login, Enter OTP, or Register an Account to Access the AI Dashboard</p>
         </div>
     """, unsafe_allow_html=True)
 
@@ -218,18 +234,6 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
-
-
-def get_base64_image(image_path):
-    try:
-        with open(image_path, "rb") as img_file:
-            encoded = base64.b64encode(img_file.read()).decode()
-            return f"data:image/png;base64,{encoded}"
-    except Exception:
-        return ""
-
-
-logo_base64 = get_base64_image("Logo.png")
 
 # ==========================================
 # 2. Header & Action Controls
@@ -553,7 +557,7 @@ def broadcast_pdf_report_to_all_users(pdf_buffer):
 
 
 # ==========================================
-# 6. Sidebar Layout (Restored Custom Card Design)
+# 6. Sidebar Layout
 # ==========================================
 if logo_base64:
     st.sidebar.markdown(
@@ -565,7 +569,6 @@ else:
         "https://img.icons8.com/color/96/000000/cyber-security.png", width=90
     )
 
-# Restored Custom Logged-in User Card
 st.sidebar.markdown(
     f"""
     <div style="background-color: #0d2318; border: 1px solid #1e4630; border-radius: 8px; padding: 14px; margin-bottom: 15px;">
@@ -584,9 +587,7 @@ if st.sidebar.button("🚪 Logout", use_container_width=True):
 
 st.sidebar.divider()
 
-# Restored Notification & Alert Center Cards
 st.sidebar.subheader("🔔 Notification & Alert Center")
-
 st.sidebar.markdown(
     """
     <div style="background-color: #121926; border: 1px solid #1e293b; border-radius: 8px; padding: 12px; margin-bottom: 10px;">
