@@ -1,3 +1,11 @@
+from alerts import send_security_alert_to_all
+from database import (
+    get_db_connection,
+    register_user,
+    get_all_registered_users,
+    create_users_table,
+    fetch_recent_threats,
+)
 import base64
 from datetime import datetime
 from io import BytesIO
@@ -7,6 +15,7 @@ import time
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from log_integration import handle_security_event
 from PIL import Image
 import pandas as pd
 import plotly.express as px
@@ -22,17 +31,6 @@ from reportlab.platypus import (
     TableStyle,
 )
 import streamlit as st
-
-# --- EXACT REQUESTED IMPORTS ---
-from alerts import send_security_alert_to_all
-from database import (
-    get_db_connection,
-    register_user,
-    get_all_registered_users,
-    create_users_table,
-    fetch_recent_threats,
-)
-from log_integration import handle_security_event
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
