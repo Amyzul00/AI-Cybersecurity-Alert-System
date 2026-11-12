@@ -23,7 +23,7 @@ from reportlab.platypus import (
 )
 import streamlit as st
 
-# Import custom backend modules
+# Import custom backend modules including register_user & get_all_registered_users
 from alerts import send_security_alert_to_all
 from database import (
     create_users_table,
@@ -203,16 +203,8 @@ if not st.session_state['logged_in']:
                 if st.button("Register Now", use_container_width=True):
                     if reg_user and reg_email and reg_pass:
                         try:
-                            conn = get_db_connection()
-                            cursor = conn.cursor()
-                            cursor.execute(
-                                "INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, ?)",
-                                (reg_user, reg_pass, reg_email, 'user')
-                            )
-                            conn.commit()
-                            cursor.close()
-                            conn.close()
-                            
+                            # Using register_user helper from database module
+                            register_user(reg_user, reg_pass, reg_email, 'user')
                             st.success("Account successfully registered! Please switch to the 'Login' tab.")
                         except Exception as err:
                             st.error(f"Database error: {err}")
@@ -512,14 +504,27 @@ def broadcast_pdf_report_to_all_users(pdf_buffer):
     port = 587
 
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT email FROM users WHERE email IS NOT NULL AND email != ''")
-        users = cursor.fetchall()
-        cursor.close()
-        conn.close()
+        # Using get_all_registered_users or direct query via get_db_connection
+        registered_users = get_all_registered_users() if 'get_all_registered_users' in globals() else []
+        
+        recipient_emails = []
+        if registered_users:
+            for u in registered_users:
+                # Handle tuple/dict return formats from different database helpers
+                if isinstance(u, dict) and u.get('email'):
+                    recipient_emails.append(u['email'])
+                elif isinstance(u, (list, tuple)) and len(u) > 2:
+                    recipient_emails.append(u[2]) # Assuming index 2 is email
+        
+        if not recipient_emails:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT email FROM users WHERE email IS NOT NULL AND email != ''")
+            users = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            recipient_emails = [row['email'] for row in users]
 
-        recipient_emails = [row['email'] for row in users]
         if not recipient_emails:
             return 0
 
@@ -600,7 +605,7 @@ if st.sidebar.button("🚪 Logout", use_container_width=True):
 
 st.sidebar.divider()
 
-# --- NOTIFICATION & ALERT CENTER (FROM STEP 2) ---
+# --- NOTIFICATION & ALERT CENTER ---
 st.sidebar.subheader("🚨 Notification & Alert Center")
 
 recent_threats = fetch_recent_threats(limit=10)
