@@ -462,7 +462,15 @@ if not st.session_state["logged_in"]:
                 username_input = st.text_input("Username or Email", key="login_username")
                 password = st.text_input("Password", type="password", key="login_password")
                 
-                st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+                # --- FORGOT PASSWORD CLICKABLE LINK (AT RED PEN POSITION) ---
+                col_fp1, col_fp2 = st.columns([1, 1])
+                with col_fp1:
+                    if st.button("Forgot Password?", key="forgot_pass_link", help="Click to reset your password"):
+                        st.session_state["auth_view"] = "Forgot"
+                        st.session_state["forgot_step"] = 1
+                        st.rerun()
+
+                st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
                 if st.button("Proceed to OTP Verification", use_container_width=True, type="primary"):
                     if username_input and password:
                         try:
@@ -583,7 +591,8 @@ if not st.session_state["logged_in"]:
                             else:
                                 st.error("Incorrect verification code or empty password fields.")
                     with c_f2:
-                        if st.button("Back", use_container_width=True):
+                        if st.button("Back to Login", use_container_width=True):
+                            st.session_state["auth_view"] = "Login"
                             st.session_state["forgot_step"] = 1
                             st.rerun()
 
