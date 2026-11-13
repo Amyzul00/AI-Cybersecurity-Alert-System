@@ -833,11 +833,11 @@ with col_download:
 
         if st.button("📧 Email PDF Report to All Users"):
             try:
-                conn = sqlite3.connect("threat_logs.db")
-                cursor = conn.cursor()
-                cursor.execute("SELECT email FROM users")
-                rows = cursor.fetchall()
-                conn.close()
+                with sqlite3.connect("threat_logs.db") as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT email FROM users")
+                    rows = cursor.fetchall()
+                
                 recipient_emails = [row[0] for row in rows if row[0]]
                 
                 if not recipient_emails:
