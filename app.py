@@ -32,7 +32,6 @@ from reportlab.platypus import (
     TableStyle,
 )
 import streamlit as st
-import mysql.connector
 import sqlite3
 
 # --- PAGE CONFIGURATION ---
@@ -88,26 +87,18 @@ def verify_password(plain_password, stored_password):
     return plain_password == stored_password
 
 # ==========================================
-# AUTOMATED MYSQL EMAIL & ALERT FUNCTIONS
+# AUTOMATED SQLITE EMAIL & ALERT FUNCTIONS
 # ==========================================
 def get_registered_user_emails():
-    """Fetches all non-empty email addresses from XAMPP MySQL (cybersecurity_db.users)."""
+    """Fetches all registered user emails from the cloud-compatible SQLite database."""
     emails = []
     try:
-        conn = mysql.connector.connect(
-            host="localhost",
-            user="root",       # Default XAMPP MySQL user
-            password="",       # Default XAMPP MySQL password (empty)
-            database="cybersecurity_db"
-        )
+        conn = sqlite3.connect("threat_logs.db")
         cursor = conn.cursor()
-        # Only select valid, non-empty emails where @ exists
         cursor.execute("SELECT email FROM users WHERE email IS NOT NULL AND email != ''")
         results = cursor.fetchall()
-        emails = [row[0].strip() for row in results if row and "@" in str(row[0])]
-        
-        cursor.close()
         conn.close()
+        emails = [row[0].strip() for row in results if row and "@" in str(row[0])]
     except Exception as e:
         print(f"Database error fetching user emails: {e}")
     return emails
@@ -129,7 +120,7 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=None):
     WARNING: The Deep LSTM Intrusion Detection System has detected a potential threat.
 
     Threat Classification: {threat_label}{conf_text}
-    Database Source: cybersecurity_db
+    Database Source: threat_logs.db
 
     Please check the security dashboard immediately for detailed logs and mitigation steps.
     """
@@ -866,14 +857,14 @@ if predicted_class.lower() != "normal":
     st.error(f"🚨 Deep LSTM Threat Detected: **{predicted_class}** ({confidence:.2f}%)")
 
     if st.session_state.last_alerted_threat != predicted_class:
-        with st.spinner("Auto-broadcasting threat alert to registered XAMPP users..."):
+        with st.spinner("Auto-broadcasting threat alert to registered database users..."):
             sent_count = auto_send_lstm_threat_alert(predicted_class, confidence)
             
             if sent_count > 0:
                 st.toast(f"🚨 Threat alert auto-sent to {sent_count} user(s)!", icon="📧")
                 st.session_state.last_alerted_threat = predicted_class
             else:
-                st.warning("Threat detected, but no valid user emails were found in `cybersecurity_db`.")
+                st.warning("Threat detected, but no valid user emails were found in `threat_logs.db`.")
 else:
     st.session_state.last_alerted_threat = None
 
@@ -933,7 +924,7 @@ with col_download:
                 recipient_emails = get_registered_user_emails()
                 
                 if not recipient_emails:
-                    st.warning("No registered user emails found in the XAMPP database.")
+                    st.warning("No registered user emails found in the database.")
                 else:
                     sender_email = "warisansecurityalerts@gmail.com"
                     app_password = "zjmm vunm ngec wkvu"
@@ -966,9 +957,9 @@ with col_download:
                         except Exception as inner_e:
                             print(f"[-] Failed to send email to {recipient}: {inner_e}")
                     
-                    st.success(f"Successfully broadcasted report to {success_count} out of {len(recipient_emails)} registered user(s) from XAMPP!")
+                    st.success(f"Successfully broadcasted report to {success_count} out of {len(recipient_emails)} registered user(s)!")
                     
             except Exception as e:
-                st.error(f"XAMPP Database Connection or Broadcast failed: {e}")
+                st.error(f"Broadcast failed: {e}")
     else:
         st.caption("🔒 *Multi-user PDF broadcast is restricted to Administrator accounts.*")
