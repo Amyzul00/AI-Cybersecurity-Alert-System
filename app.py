@@ -169,37 +169,39 @@ if not st.session_state["logged_in"]:
             # --- LOGIN TAB ---
             with tab_login:
                 st.subheader("System Login (2FA Security)")
-                username_or_email = st.text_input("Username or Email", key="login_username_or_email")
+                username_input = st.text_input("Username or Email", key="login_username")
                 password = st.text_input("Password", type="password", key="login_password")
                 
                 if st.button("Proceed to OTP Verification", use_container_width=True):
-                    if username_or_email and password:
+                    if username_input and password:
                         try:
-                            conn = get_db_connection()
-                            with conn.cursor() as cursor:
-                                cursor.execute(
-                                    "SELECT * FROM users WHERE username = %s OR email = %s", 
-                                    (username_or_email, username_or_email)
-                                )
-                                user_record = cursor.fetchone()
+                            conn = sqlite3.connect("threat_logs.db")
+                            cursor = conn.cursor()
+                            cursor.execute("SELECT username, password, role FROM users WHERE username = ? OR email = ?", (username_input, username_input))
+                            user_record = cursor.fetchone()
                             conn.close()
                             
-                            if user_record and verify_password(password, user_record["password"]):
-                                user_email = user_record["email"]
-                                if not user_email:
-                                    st.error("Your account does not have a registered email address.")
-                                else:
-                                    otp_code = str(random.randint(100000, 999999))
-                                    
-                                    st.session_state["generated_otp"] = otp_code
-                                    st.session_state["temp_username"] = user_record["username"]
-                                    st.session_state["temp_role"] = user_record["role"].upper()
-                                    st.session_state["temp_email"] = user_email
-                                    
-                                    st.session_state["otp_required"] = True
-                                    st.success("Credentials verified! OTP generated successfully.")
-                                    time.sleep(0.5)
-                                    st.rerun()
+                            if user_record and verify_password(password, user_record[1]):
+                                # Fetch email for session record
+                                conn_email = sqlite3.connect("threat_logs.db")
+                                cur_email = conn_email.cursor()
+                                cur_email.execute("SELECT email FROM users WHERE username = ?", (user_record[0],))
+                                email_row = cur_email.fetchone()
+                                conn_email.close()
+                                
+                                user_email = email_row[0] if email_row else "warisansecurityalerts@gmail.com"
+                                
+                                otp_code = str(random.randint(100000, 999999))
+                                
+                                st.session_state["generated_otp"] = otp_code
+                                st.session_state["temp_username"] = user_record[0]
+                                st.session_state["temp_role"] = str(user_record[2]).upper()
+                                st.session_state["temp_email"] = user_email
+                                
+                                st.session_state["otp_required"] = True
+                                st.success("Credentials verified! OTP generated successfully.")
+                                time.sleep(0.5)
+                                st.rerun()
                             else:
                                 st.error("Incorrect Username/Email or Password!")
                         except Exception as e:
@@ -833,10 +835,11 @@ with col_download:
 
         if st.button("📧 Email PDF Report to All Users"):
             try:
-                with sqlite3.connect("threat_logs.db") as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT email FROM users")
-                    rows = cursor.fetchall()
+                conn = sqlite3.connect("threat_logs.db")
+                cursor = conn.cursor()
+                cursor.execute("SELECT email FROM users")
+                rows = cursor.fetchall()
+                conn.close()
                 
                 recipient_emails = [row[0] for row in rows if row[0]]
                 
