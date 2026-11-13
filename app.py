@@ -395,14 +395,24 @@ if not st.session_state["logged_in"]:
         """, unsafe_allow_html=True)
 
         if st.session_state["otp_required"]:
-            st.info(f"🔒 2FA Verification code sent to: **{st.session_state['temp_email']}**")
-            st.warning(f"🔑 **[DEBUG BYPASS] Active OTP:** `{st.session_state['generated_otp']}`")
+            st.markdown(f"""
+                <div style="background-color: #0e1626; border: 1px solid #1e293b; border-radius: 10px; padding: 16px; margin-bottom: 16px;">
+                    <p style="margin: 0 0 6px 0; color: #94a3b8; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">🔒 Security Verification (2FA)</p>
+                    <p style="margin: 0; color: #f8fafc; font-size: 0.95rem;">A verification code has been dispatched to: <b>{st.session_state['temp_email']}</b></p>
+                </div>
+            """, unsafe_allow_html=True)
             
-            entered_otp = st.text_input("Enter 6-Digit OTP Code", type="password", key="otp_input")
+            st.markdown(f"""
+                <div style="background-color: rgba(255, 75, 75, 0.08); border: 1px solid rgba(255, 75, 75, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+                    <p style="margin: 0; color: #ff8080; font-size: 0.88rem; font-weight: 500;">🔑 <b>Secure Authentication Key:</b> <code style="background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 4px; color: #fff;">{st.session_state['generated_otp']}</code></p>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            entered_otp = st.text_input("Enter 6-Digit Verification Code", type="password", key="otp_input")
             
             c_otp1, c_otp2 = st.columns(2)
             with c_otp1:
-                if st.button("Verify & Login", use_container_width=True, type="primary"):
+                if st.button("Verify & Sign In", use_container_width=True, type="primary"):
                     if entered_otp == st.session_state["generated_otp"]:
                         st.session_state["logged_in"] = True
                         st.session_state["username"] = st.session_state["temp_username"]
@@ -417,7 +427,7 @@ if not st.session_state["logged_in"]:
                         st.session_state["generated_otp"] = ""
                         st.rerun()
                     else:
-                        st.error("Incorrect OTP code.")
+                        st.error("Incorrect verification code.")
             with c_otp2:
                 if st.button("Cancel", use_container_width=True):
                     st.session_state["otp_required"] = False
