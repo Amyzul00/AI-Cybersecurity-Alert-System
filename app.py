@@ -317,17 +317,21 @@ if not st.session_state["logged_in"]:
                 reg_user = st.text_input("Choose Username", key="reg_username")
                 reg_email = st.text_input("Email Address (For Notifications & OTP)", key="reg_email")
                 reg_pass = st.text_input("Choose Password", type="password", key="reg_password")
+                reg_confirm_pass = st.text_input("Confirm Password", type="password", key="reg_confirm_password")
                 
                 st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
                 if st.button("Register Now", use_container_width=True, type="primary"):
-                    if reg_user and reg_email and reg_pass:
-                        success = register_user(reg_user, reg_email, reg_pass, "user")
-                        if success:
-                            st.success("Account successfully registered! Switch to 'Login'.")
+                    if reg_user and reg_email and reg_pass and reg_confirm_pass:
+                        if reg_pass == reg_confirm_pass:
+                            success = register_user(reg_user, reg_email, reg_pass, "user")
+                            if success:
+                                st.success("Account successfully registered! Switch to 'Login'.")
+                            else:
+                                st.error("Registration failed. Username or email may already exist.")
                         else:
-                            st.error("Registration failed. Username or email may already exist.")
+                            st.error("Passwords do not match. Please re-enter.")
                     else:
-                        st.warning("Please fill in all fields including email.")
+                        st.warning("Please fill in all fields.")
 
             with tab_forgot:
                 st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
@@ -374,23 +378,27 @@ if not st.session_state["logged_in"]:
                     
                     entered_reset_code = st.text_input("Enter 6-Digit Reset Code", key="entered_r_code")
                     new_password_input = st.text_input("Enter New Password", type="password", key="new_pword")
+                    new_confirm_password_input = st.text_input("Confirm New Password", type="password", key="new_cpword")
                     
                     c_f1, c_f2 = st.columns(2)
                     with c_f1:
                         if st.button("Update Password", use_container_width=True, type="primary"):
-                            if entered_reset_code == st.session_state["forgot_code"] and new_password_input:
-                                updated = update_user_password(st.session_state["forgot_email"], new_password_input)
-                                if updated:
-                                    st.success("Password successfully updated! Please log in.")
-                                    st.session_state["forgot_step"] = 1
-                                    st.session_state["forgot_email"] = ""
-                                    st.session_state["forgot_code"] = ""
-                                    time.sleep(1.2)
-                                    st.rerun()
+                            if entered_reset_code == st.session_state["forgot_code"] and new_password_input and new_confirm_password_input:
+                                if new_password_input == new_confirm_password_input:
+                                    updated = update_user_password(st.session_state["forgot_email"], new_password_input)
+                                    if updated:
+                                        st.success("Password successfully updated! Please log in.")
+                                        st.session_state["forgot_step"] = 1
+                                        st.session_state["forgot_email"] = ""
+                                        st.session_state["forgot_code"] = ""
+                                        time.sleep(1.2)
+                                        st.rerun()
+                                    else:
+                                        st.error("Failed to update password in database.")
                                 else:
-                                    st.error("Failed to update password in database.")
+                                    st.error("Passwords do not match.")
                             else:
-                                st.error("Incorrect verification code or empty password.")
+                                st.error("Incorrect verification code or empty password fields.")
                     with c_f2:
                         if st.button("Back", use_container_width=True):
                             st.session_state["forgot_step"] = 1
