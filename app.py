@@ -441,7 +441,8 @@ if not st.session_state["logged_in"]:
                     st.rerun()
 
         else:
-            nav_col1, nav_col2, nav_col3 = st.columns(3)
+            # Only show Sign In and Register on top navigation tabs (Recovery is hidden until requested)
+            nav_col1, nav_col2 = st.columns(2)
             with nav_col1:
                 if st.button("Sign In", use_container_width=True, type="primary" if st.session_state["auth_view"] == "Login" else "secondary"):
                     st.session_state["auth_view"] = "Login"
@@ -449,10 +450,6 @@ if not st.session_state["logged_in"]:
             with nav_col2:
                 if st.button("Register", use_container_width=True, type="primary" if st.session_state["auth_view"] == "Register" else "secondary"):
                     st.session_state["auth_view"] = "Register"
-                    st.rerun()
-            with nav_col3:
-                if st.button("Recovery", use_container_width=True, type="primary" if st.session_state["auth_view"] == "Forgot" else "secondary"):
-                    st.session_state["auth_view"] = "Forgot"
                     st.rerun()
 
             st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
