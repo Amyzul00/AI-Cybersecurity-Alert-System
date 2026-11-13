@@ -125,5 +125,24 @@ def get_all_registered_users():
         conn.close()
 
 
+def update_user_password(email: str, new_password: str) -> bool:
+    """Update a user's password based on their email address."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "UPDATE users SET password = ? WHERE email = ?",
+            (new_password, email.strip().lower())
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+    except Exception as e:
+        print(f"[-] Password update error: {e}")
+        return False
+    finally:
+        cursor.close()
+        conn.close()
+
+
 # Automatically initialize database schema on module import
 init_db()
