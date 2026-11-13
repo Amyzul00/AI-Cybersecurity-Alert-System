@@ -110,6 +110,10 @@ if "temp_email" not in st.session_state:
 if "last_alerted_threat" not in st.session_state:
     st.session_state.last_alerted_threat = None
 
+# Auth View Navigation State ("Login", "Register", "Forgot Password")
+if "auth_view" not in st.session_state:
+    st.session_state["auth_view"] = "Login"
+
 # Forgot Password Session States
 if "forgot_step" not in st.session_state:
     st.session_state["forgot_step"] = 1
@@ -191,6 +195,40 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=None):
 
 def send_security_alert_to_all(src_ip, threat_type):
     return auto_send_lstm_threat_alert(threat_type)
+
+def send_welcome_email(recipient_email, username):
+    """Sends a welcome notification email when a new account is registered."""
+    SENDER_EMAIL = "warisansecurityalerts@gmail.com"
+    SENDER_PASSWORD = "zjmm vunm ngec wkvu"
+    
+    subject = "🛡️ [WARISAN SOC] Account Successfully Registered"
+    body = f"""
+    Hello {username},
+
+    Your account for the Warisan Security Malware Operations SOC Portal has been successfully created!
+
+    You can now log in using your credentials to access the AI threat detection dashboard, Deep LSTM analytics, and SOAR incident response tools.
+
+    --
+    Warisan Security Operations Center (SOC) Automated Notification Service
+    """
+    try:
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(SENDER_EMAIL, SENDER_PASSWORD)
+        
+        msg = MIMEMultipart()
+        msg["From"] = SENDER_EMAIL
+        msg["To"] = recipient_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain"))
+        
+        server.sendmail(SENDER_EMAIL, recipient_email, msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        print(f"[-] Failed to send welcome email: {e}")
+        return False
 
 def send_password_reset_email(recipient_email, reset_code):
     """Sends a password reset verification code via Gmail SMTP."""
@@ -277,10 +315,25 @@ if not st.session_state["logged_in"]:
                     st.rerun()
 
         else:
-            tab_login, tab_register, tab_forgot = st.tabs(["🔑 Login", "📝 Register", "🔄 Forgot Password"])
+            # Custom view selector buttons acting as tabs
+            nav_col1, nav_col2, nav_col3 = st.columns(3)
+            with nav_col1:
+                if st.button("🔑 Login", use_container_width=True, type="primary" if st.session_state["auth_view"] == "Login" else "secondary"):
+                    st.session_state["auth_view"] = "Login"
+                    st.rerun()
+            with nav_col2:
+                if st.button("📝 Register", use_container_width=True, type="primary" if st.session_state["auth_view"] == "Register" else "secondary"):
+                    st.session_state["auth_view"] = "Register"
+                    st.rerun()
+            with nav_col3:
+                if st.button("🔄 Reset", use_container_width=True, type="primary" if st.session_state["auth_view"] == "Forgot" else "secondary"):
+                    st.session_state["auth_view"] = "Forgot"
+                    st.rerun()
 
-            with tab_login:
-                st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+
+            if st.session_state["auth_view"] == "Login":
+                st.subheader("System Login (2FA Security)")
                 username_input = st.text_input("Username or Email", key="login_username")
                 password = st.text_input("Password", type="password", key="login_password")
                 
@@ -312,8 +365,8 @@ if not st.session_state["logged_in"]:
                     else:
                         st.warning("Please fill in all fields.")
 
-            with tab_register:
-                st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+            elif st.session_state["auth_view"] == "Register":
+                st.subheader("Register New Account")
                 reg_user = st.text_input("Choose Username", key="reg_username")
                 reg_email = st.text_input("Email Address (For Notifications & OTP)", key="reg_email")
                 reg_pass = st.text_input("Choose Password", type="password", key="reg_password")
@@ -325,7 +378,14 @@ if not st.session_state["logged_in"]:
                         if reg_pass == reg_confirm_pass:
                             success = register_user(reg_user, reg_email, reg_pass, "user")
                             if success:
-                                st.success("Account successfully registered! Switch to 'Login'.")
+                                # Send welcome email
+                                with st.spinner("Sending confirmation email..."):
+                                    send_welcome_email(reg_email, reg_user)
+                                
+                                st.success("Account successfully registered & confirmation email sent! Redirecting to login...")
+                                time.sleep(1.5)
+                                st.session_state["auth_view"] = "Login"
+                                st.rerun()
                             else:
                                 st.error("Registration failed. Username or email may already exist.")
                         else:
@@ -333,9 +393,7 @@ if not st.session_state["logged_in"]:
                     else:
                         st.warning("Please fill in all fields.")
 
-            with tab_forgot:
-                st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-                
+            elif st.session_state["auth_view"] == "Forgot":
                 if st.session_state["forgot_step"] == 1:
                     st.subheader("Reset Password")
                     reset_email_input = st.text_input("Enter your registered email address", key="reset_email")
@@ -387,11 +445,12 @@ if not st.session_state["logged_in"]:
                                 if new_password_input == new_confirm_password_input:
                                     updated = update_user_password(st.session_state["forgot_email"], new_password_input)
                                     if updated:
-                                        st.success("Password successfully updated! Please log in.")
+                                        st.success("Password successfully updated! Redirecting to login...")
                                         st.session_state["forgot_step"] = 1
                                         st.session_state["forgot_email"] = ""
                                         st.session_state["forgot_code"] = ""
                                         time.sleep(1.2)
+                                        st.session_state["auth_view"] = "Login"
                                         st.rerun()
                                     else:
                                         st.error("Failed to update password in database.")
