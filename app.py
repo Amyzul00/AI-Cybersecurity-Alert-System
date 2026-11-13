@@ -5,6 +5,7 @@ from database import (
     fetch_recent_threats,
     register_user,
     get_all_registered_users,
+    update_user_password,
 )
 import threat_detector
 import base64
@@ -13,7 +14,6 @@ from io import BytesIO
 import random
 import smtplib
 import time
-from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from PIL import Image
@@ -110,6 +110,14 @@ if "temp_email" not in st.session_state:
 if "last_alerted_threat" not in st.session_state:
     st.session_state.last_alerted_threat = None
 
+# Forgot Password Session States
+if "forgot_step" not in st.session_state:
+    st.session_state["forgot_step"] = 1
+if "forgot_email" not in st.session_state:
+    st.session_state["forgot_email"] = ""
+if "forgot_code" not in st.session_state:
+    st.session_state["forgot_code"] = ""
+
 # ==========================================
 # HELPER: BASE64 IMAGE ENCODING
 # ==========================================
@@ -184,6 +192,42 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=None):
 def send_security_alert_to_all(src_ip, threat_type):
     return auto_send_lstm_threat_alert(threat_type)
 
+def send_password_reset_email(recipient_email, reset_code):
+    """Sends a password reset verification code via Gmail SMTP."""
+    SENDER_EMAIL = "warisansecurityalerts@gmail.com"
+    SENDER_PASSWORD = "zjmm vunm ngec wkvu"
+    
+    subject = "🔑 [WARISAN SOC] Password Reset Verification Code"
+    body = f"""
+    Hello,
+
+    We received a request to reset your password for the Warisan Security Malware Operations SOC Portal.
+    
+    Your Password Reset Verification Code is: {reset_code}
+
+    If you did not request this password reset, please ignore this email or contact the administrator.
+
+    --
+    Warisan Security Operations Center (SOC) Automated Service
+    """
+    try:
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(SENDER_EMAIL, SENDER_PASSWORD)
+        
+        msg = MIMEMultipart()
+        msg["From"] = SENDER_EMAIL
+        msg["To"] = recipient_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain"))
+        
+        server.sendmail(SENDER_EMAIL, recipient_email, msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        print(f"[-] Failed to send password reset email: {e}")
+        return False
+
 def handle_security_event(message, is_critical=True):
     print(f"[SOAR] {message}")
 
@@ -233,7 +277,7 @@ if not st.session_state["logged_in"]:
                     st.rerun()
 
         else:
-            tab_login, tab_register = st.tabs(["🔑 System Login", "📝 Register Account"])
+            tab_login, tab_register, tab_forgot = st.tabs(["🔑 Login", "📝 Register", "🔄 Forgot Password"])
 
             with tab_login:
                 st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
@@ -246,7 +290,7 @@ if not st.session_state["logged_in"]:
                         try:
                             conn = get_db_connection()
                             cursor = conn.cursor()
-                            cursor.execute("SELECT username, password, role, email FROM users WHERE username = %s OR email = %s", (username_input, username_input))
+                            cursor.execute("SELECT username, password, role, email FROM users WHERE username = ? OR email = ?", (username_input, username_input))
                             user_record = cursor.fetchone()
                             cursor.close()
                             conn.close()
@@ -279,11 +323,78 @@ if not st.session_state["logged_in"]:
                     if reg_user and reg_email and reg_pass:
                         success = register_user(reg_user, reg_email, reg_pass, "user")
                         if success:
-                            st.success("Account successfully registered! Switch to 'System Login'.")
+                            st.success("Account successfully registered! Switch to 'Login'.")
                         else:
                             st.error("Registration failed. Username or email may already exist.")
                     else:
                         st.warning("Please fill in all fields including email.")
+
+            with tab_forgot:
+                st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+                
+                if st.session_state["forgot_step"] == 1:
+                    st.subheader("Reset Password")
+                    reset_email_input = st.text_input("Enter your registered email address", key="reset_email")
+                    
+                    if st.button("Send Reset Code", use_container_width=True, type="primary"):
+                        if reset_email_input:
+                            try:
+                                conn = get_db_connection()
+                                cursor = conn.cursor()
+                                cursor.execute("SELECT email FROM users WHERE email = ?", (reset_email_input.strip().lower(),))
+                                record = cursor.fetchone()
+                                cursor.close()
+                                conn.close()
+                                
+                                if record:
+                                    code = str(random.randint(100000, 999999))
+                                    st.session_state["forgot_code"] = code
+                                    st.session_state["forgot_email"] = reset_email_input.strip().lower()
+                                    
+                                    with st.spinner("Sending verification code to email..."):
+                                        sent = send_password_reset_email(st.session_state["forgot_email"], code)
+                                    
+                                    if sent:
+                                        st.session_state["forgot_step"] = 2
+                                        st.success("Verification code sent to your email!")
+                                        time.sleep(0.8)
+                                        st.rerun()
+                                    else:
+                                        st.error("Failed to send email. Please check SMTP credentials.")
+                                else:
+                                    st.error("Email address not found in database.")
+                            except Exception as e:
+                                st.error(f"Error: {e}")
+                        else:
+                            st.warning("Please enter your email address.")
+
+                elif st.session_state["forgot_step"] == 2:
+                    st.info(f"🔑 Verification code sent to: **{st.session_state['forgot_email']}**")
+                    st.warning(f"💡 **[DEBUG BYPASS] Reset Code:** `{st.session_state['forgot_code']}`")
+                    
+                    entered_reset_code = st.text_input("Enter 6-Digit Reset Code", key="entered_r_code")
+                    new_password_input = st.text_input("Enter New Password", type="password", key="new_pword")
+                    
+                    c_f1, c_f2 = st.columns(2)
+                    with c_f1:
+                        if st.button("Update Password", use_container_width=True, type="primary"):
+                            if entered_reset_code == st.session_state["forgot_code"] and new_password_input:
+                                updated = update_user_password(st.session_state["forgot_email"], new_password_input)
+                                if updated:
+                                    st.success("Password successfully updated! Please log in.")
+                                    st.session_state["forgot_step"] = 1
+                                    st.session_state["forgot_email"] = ""
+                                    st.session_state["forgot_code"] = ""
+                                    time.sleep(1.2)
+                                    st.rerun()
+                                else:
+                                    st.error("Failed to update password in database.")
+                            else:
+                                st.error("Incorrect verification code or empty password.")
+                    with c_f2:
+                        if st.button("Back", use_container_width=True):
+                            st.session_state["forgot_step"] = 1
+                            st.rerun()
 
         st.markdown("""
             <div style="text-align: center; margin-top: 24px; font-size: 0.78rem; color: #64748b;">
@@ -292,6 +403,7 @@ if not st.session_state["logged_in"]:
         """, unsafe_allow_html=True)
 
     st.stop()
+
 
 # ==========================================
 # VIEW 2: MAIN DASHBOARD
