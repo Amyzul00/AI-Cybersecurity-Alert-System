@@ -32,7 +32,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 import streamlit as st
-import pymysql
+import sqlite3
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
@@ -833,34 +833,21 @@ with col_download:
 
         if st.button("📧 Email PDF Report to All Users"):
             try:
-                # Step 1: Connect to XAMPP MySQL database and fetch ALL registered user emails
-                connection = pymysql.connect(
-                    host='localhost',
-                    user='root',
-                    password='',
-                    database='cybersecurity_db',
-                    charset='utf8mb4',
-                    cursorclass=pymysql.cursors.DictCursor
-                )
-                
-                with connection.cursor() as cursor:
-                    cursor.execute("SELECT email FROM users")
-                    rows = cursor.fetchall()
-                    
-                connection.close()
-                
-                # Extract emails into a clean list, filtering out empty values
-                recipient_emails = [row['email'] for row in rows if row.get('email')]
+                conn = sqlite3.connect("threat_logs.db")
+                cursor = conn.cursor()
+                cursor.execute("SELECT email FROM users")
+                rows = cursor.fetchall()
+                conn.close()
+                recipient_emails = [row[0] for row in rows if row[0]]
                 
                 if not recipient_emails:
-                    st.warning("No registered user emails found in the XAMPP database.")
+                    st.warning("No registered user emails found in the database.")
                 else:
                     sender_email = "warisansecurityalerts@gmail.com"
                     app_password = "zjmm vunm ngec wkvu"
                     success_count = 0
                     pdf_filename = "executive_threat_report.pdf"
                     
-                    # Step 2: Loop through every registered user and dispatch email
                     for recipient in recipient_emails:
                         try:
                             msg = MIMEMultipart()
@@ -887,9 +874,9 @@ with col_download:
                         except Exception as inner_e:
                             print(f"[-] Failed to send email to {recipient}: {inner_e}")
                     
-                    st.success(f"Successfully broadcasted report to {success_count} out of {len(recipient_emails)} registered user(s) from XAMPP!")
+                    st.success(f"Successfully broadcasted report to {success_count} registered user(s)!")
                     
             except Exception as e:
-                st.error(f"XAMPP Database Connection or Broadcast failed: {e}")
+                st.error(f"Broadcast failed: {e}")
     else:
         st.caption("🔒 *Multi-user PDF broadcast is restricted to Administrator accounts.*")
