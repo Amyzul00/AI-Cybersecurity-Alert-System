@@ -798,16 +798,6 @@ def generate_pdf_report(dataframe):
 # ==========================================
 # SIDEBAR (ORGANIZED & EXPANDABLE SECTIONS)
 # ==========================================
-st.sidebar.markdown(
-    """
-    <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 5px 15px 5px; border-bottom: 1px solid #1f2937; margin-bottom: 15px;">
-        <span style="font-size: 1.1rem; font-weight: bold; color: #ffffff;">Navigation</span>
-        <i class="fa-solid fa-ellipsis-vertical" style="color: #94a3b8; font-size: 1.2rem;" title="Options"></i>
-    </div>
-    """, 
-    unsafe_allow_html=True
-)
-
 if logo_base64:
     st.sidebar.markdown(f'<div style="text-align: center; margin-bottom: 12px;"><img src="{logo_base64}" style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 0 12px rgba(255,75,75,0.6);"></div>', unsafe_allow_html=True)
 
@@ -866,14 +856,14 @@ with st.sidebar.expander("🛡️ Incident Response (SOAR)", expanded=False):
         handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated (User: {st.session_state['username']}).", is_critical=True)
         st.success(f"Successfully isolated host {target_ip}!")
 
-# --- ADMIN CONTROLS IN SIDEBAR WITH FONT AWESOME ICON ---
+# --- ADMIN CONTROLS IN SIDEBAR (ICON REMOVED) ---
 user_role = st.session_state.get('role', 'user').strip().lower()
 if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
     user_role = "admin"
 
 if user_role == 'admin':
     st.sidebar.markdown("---")
-    st.sidebar.markdown('### <i class="fa-solid fa-bars" style="color: #ff4b4b; margin-right: 8px;"></i> Admin Controls', unsafe_allow_html=True)
+    st.sidebar.markdown("### Admin Controls")
 
     if st.sidebar.button("📧 Email PDF Report to All Users", use_container_width=True):
         try:
