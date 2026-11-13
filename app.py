@@ -55,7 +55,6 @@ st.markdown("""
         background: radial-gradient(circle at 50% 30%, #121826 0%, #080a0f 70%);
         color: #e2e8f0;
     }
-    header {visibility: hidden;}
 
     /* Modern SOC Auth Card Container */
     div[data-testid="column"]:nth-of-type(2) {
@@ -376,7 +375,7 @@ def handle_security_event(message, is_critical=True):
     print(f"[SOAR] {message}")
 
 # ==========================================
-# PERSISTENT SIDEBAR INITIALIZATION (Ensures sidebar stays expanded)
+# PERSISTENT SIDEBAR INITIALIZATION
 # ==========================================
 st.sidebar.markdown(
     """
@@ -1145,7 +1144,7 @@ with col_download:
             use_container_width=True,
         )
 
-        pdf_buffer = executive_threat_report_pdf = generate_pdf_report(filtered_df)
+        pdf_buffer = generate_pdf_report(filtered_df)
         st.download_button(
             label="📄 Download PDF Report",
             data=pdf_buffer,
