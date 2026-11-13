@@ -1087,8 +1087,6 @@ predicted_class = "DDoS"
 confidence = 98.45
 
 if predicted_class.lower() != "normal":
-    st.error(f"🚨 Deep LSTM Threat Detected: **{predicted_class}** ({confidence:.2f}%)")
-
     if st.session_state.last_alerted_threat != predicted_class:
         with st.spinner("Auto-broadcasting threat alert to all registered users..."):
             sent_count = auto_send_lstm_threat_alert(predicted_class, confidence)
@@ -1115,7 +1113,7 @@ with col_logs:
 [INFO] LSTM Input Shape: (Batch_Size=25, Time_Steps=100, Features=42)
 [INFO] Layer 1 (CuDNNLSTM): Output Shape=(None, 128), Parameters=87,552
 [INFO] Dropout (0.2): Applied
-[INFO] Layer 2 (Dense Softmax): Classifying into [Normal, Bot, DDoS, PortScan]
+[Info] Layer 2 (Dense Softmax): Classifying into [Normal, Bot, DDoS, PortScan]
 [XAI] Gradient Saliency Computed: Input gradients backpropagated successfully.
 [SOAR] Firewall Controller Status: Active (Ready to push blocking rules)
 [DEBUG] Loss: 0.1421 | Val_Loss: 0.1804 | Inference Latency: 12.4ms/sample
