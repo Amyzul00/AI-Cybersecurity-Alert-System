@@ -38,6 +38,7 @@ st.set_page_config(
     page_title="Warisan Security Malware Operations - AI Threat Detection",
     page_icon="Logo.png",
     layout="wide",
+    initial_sidebar_state="expanded",
 )
 
 # --- FONT AWESOME CDN FOR SIDEBAR ICONS ---
