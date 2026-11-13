@@ -39,11 +39,11 @@ st.set_page_config(
     layout="wide",
 )
 
-# --- REMOVE EXCESS TOP PADDING & GLOBAL STYLING ---
+# --- ADJUSTED TOP PADDING & GLOBAL STYLING ---
 st.markdown("""
     <style>
     .block-container {
-        padding-top: 1.5rem !important;
+        padding-top: 3.5rem !important;
         padding-bottom: 0rem !important;
     }
     .main { background-color: #080a0f; color: #e2e8f0; }
