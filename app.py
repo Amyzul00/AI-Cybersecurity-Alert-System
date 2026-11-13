@@ -42,10 +42,8 @@ st.set_page_config(
 # --- GLOBAL SESSION STATE INITIALIZATION ---
 if "user_email" not in st.session_state:
     st.session_state["user_email"] = None
-
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
-
 if "username" not in st.session_state:
     st.session_state["username"] = ""
 if "role" not in st.session_state:
@@ -60,9 +58,10 @@ if "temp_role" not in st.session_state:
     st.session_state["temp_role"] = ""
 if "temp_email" not in st.session_state:
     st.session_state["temp_email"] = ""
-
 if "last_alerted_threat" not in st.session_state:
     st.session_state.last_alerted_threat = None
+if "auth_mode" not in st.session_state:
+    st.session_state["auth_mode"] = "Login"  # "Login" or "Register"
 
 # ==========================================
 # HELPER: BASE64 IMAGE ENCODING
@@ -81,15 +80,14 @@ logo_base64 = get_base64_image("Logo.png")
 # PASSWORD VERIFICATION HELPER
 # ==========================================
 def verify_password(plain_password, stored_password):
-    """Verify plain password against stored database password."""
     return plain_password == stored_password
 
 # ==========================================
 # AUTOMATED EMAIL & ALERT FUNCTIONS
 # ==========================================
 def auto_send_lstm_threat_alert(threat_label, confidence_score=None):
-    """Automatically emails ALL registered users when the Deep LSTM model flags a threat."""
     recipient_emails = get_all_registered_users()
+    recipient_emails = list(set([e.lower().strip() for e in recipient_emails if e and "@" in e]))
     
     if not recipient_emails:
         return 0
@@ -97,16 +95,19 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=None):
     SENDER_EMAIL = "warisansecurityalerts@gmail.com"
     SENDER_PASSWORD = "zjmm vunm ngec wkvu"
 
-    subject = f"🚨 SECURITY ALERT: {threat_label} Detected!"
+    subject = f"🚨 [WARISAN SOC] SECURITY ALERT: {threat_label} Detected!"
     conf_text = f"\nModel Confidence: {confidence_score:.2f}%" if confidence_score else ""
     
     body = f"""
-    WARNING: The Deep LSTM Intrusion Detection System has detected a potential threat.
+    WARNING: The Warisan Security Malware Operations Deep LSTM Intrusion Detection System has detected a critical network threat.
 
     Threat Classification: {threat_label}{conf_text}
-    Database Source: Cloud SQLite Database
+    Timestamp: {datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")}
 
-    Please check the security dashboard immediately for detailed logs and mitigation steps.
+    Please log in to the security dashboard immediately to review incident logs, examine XAI feature attribution, and execute SOAR firewall isolation.
+
+    --
+    Warisan Security Operations Center (SOC) Automated Notification Service
     """
 
     sent_count = 0
@@ -116,18 +117,20 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=None):
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
 
         for email in recipient_emails:
-            msg = MIMEMultipart()
-            msg["From"] = SENDER_EMAIL
-            msg["To"] = email
-            msg["Subject"] = subject
-            msg.attach(MIMEText(body, "plain"))
+            try:
+                msg = MIMEMultipart()
+                msg["From"] = SENDER_EMAIL
+                msg["To"] = email
+                msg["Subject"] = subject
+                msg.attach(MIMEText(body, "plain"))
 
-            server.sendmail(SENDER_EMAIL, email, msg.as_string())
-            sent_count += 1
-
+                server.sendmail(SENDER_EMAIL, email, msg.as_string())
+                sent_count += 1
+            except Exception:
+                pass
         server.quit()
-    except Exception as e:
-        print(f"Failed to send auto-alert email: {e}")
+    except Exception:
+        pass
 
     return sent_count
 
@@ -138,31 +141,43 @@ def handle_security_event(message, is_critical=True):
     print(f"[SOAR] {message}")
 
 # ==========================================
-# VIEW 1: LOGIN, OTP & REGISTER PAGE
+# MODERN CARD-BASED AUTH VIEW (LOGIN / REGISTER / OTP)
 # ==========================================
 if not st.session_state["logged_in"]:
-    logo_html = f'<img src="{logo_base64}" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 10px rgba(0,0,0,0.5); margin-bottom: 12px;" alt="Logo">' if logo_base64 else '<span style="font-size: 3rem;">🛡️</span>'
-
-    st.markdown(f"""
-        <div style="text-align: center; padding: 20px;">
-            {logo_html}
-            <h1 style="color: #ff4b4b; margin: 0;">Warisan Security Malware Operations</h1>
-            <p style="color: #8a99ad; font-size: 1.1rem; margin-top: 5px;">Please Login, Enter OTP, or Register an Account to Access the AI Dashboard</p>
-        </div>
+    st.markdown("""
+        <style>
+        .stApp {
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 50%, #fce7f3 100%);
+            color: #1f2937;
+        }
+        header {visibility: hidden;}
+        </style>
     """, unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
+        logo_html = f'<img src="{logo_base64}" style="width: 42px; height: 42px; border-radius: 50%; object-fit: cover; border: 1.5px solid #e5e7eb;" alt="Logo">' if logo_base64 else '<span style="font-size: 2rem;">🛡️</span>'
+
+        st.markdown(f"""
+            <div style="background: #ffffff; padding: 32px 36px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); border: 1px solid rgba(229, 231, 235, 0.8);">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px;">
+                    {logo_html}
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: #111827; letter-spacing: -0.3px;">Warisan Security</h3>
+                        <p style="margin: 0; font-size: 0.8rem; color: #6b7280;">Malware Operations & AI SOC.</p>
+                    </div>
+                </div>
+        """, unsafe_allow_html=True)
+
         if st.session_state["otp_required"]:
-            st.info(f"🔒 A security verification code (OTP) has been generated for: **{st.session_state['temp_email']}**")
-            st.warning(f"🔑 **[CLOUD BYPASS DEBUG] Your Active OTP Code is:** `{st.session_state['generated_otp']}`")
+            st.info(f"🔒 2FA Code sent to: **{st.session_state['temp_email']}**")
+            st.warning(f"🔑 **[DEBUG BYPASS] Active OTP:** `{st.session_state['generated_otp']}`")
             
-            st.subheader("Enter 6-Digit OTP Code")
-            entered_otp = st.text_input("Enter OTP Code", type="password", key="otp_input")
+            entered_otp = st.text_input("Enter 6-Digit OTP", type="password", key="otp_input")
             
-            c_otp1, c_otp2 = st.columns(2)
-            with c_otp1:
-                if st.button("Verify & Login", use_container_width=True):
+            c_o1, c_o2 = st.columns(2)
+            with c_o1:
+                if st.button("Verify & Enter", use_container_width=True):
                     if entered_otp == st.session_state["generated_otp"]:
                         st.session_state["logged_in"] = True
                         st.session_state["username"] = st.session_state["temp_username"]
@@ -175,84 +190,107 @@ if not st.session_state["logged_in"]:
                         
                         st.session_state["otp_required"] = False
                         st.session_state["generated_otp"] = ""
-                        
-                        st.success("OTP verification successful! Loading dashboard...")
-                        time.sleep(1)
                         st.rerun()
                     else:
-                        st.error("Incorrect OTP code. Please check the debug code shown above.")
-            with c_otp2:
+                        st.error("Invalid OTP code.")
+            with c_o2:
                 if st.button("Cancel", use_container_width=True):
                     st.session_state["otp_required"] = False
                     st.rerun()
 
         else:
-            tab_login, tab_register = st.tabs(["🔑 Login", "📝 Register Account"])
+            tab_c1, tab_c2 = st.columns(2)
+            with tab_c1:
+                if st.button("Log in", use_container_width=True, type="primary" if st.session_state["auth_mode"] == "Login" else "secondary"):
+                    st.session_state["auth_mode"] = "Login"
+                    st.rerun()
+            with tab_c2:
+                if st.button("Create account", use_container_width=True, type="primary" if st.session_state["auth_mode"] == "Register" else "secondary"):
+                    st.session_state["auth_mode"] = "Register"
+                    st.rerun()
 
-            with tab_login:
-                st.subheader("System Login (2FA Security)")
-                username_input = st.text_input("Username or Email", key="login_username")
-                password = st.text_input("Password", type="password", key="login_password")
+            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+
+            if st.session_state["auth_mode"] == "Login":
+                st.markdown("<h4 style='margin-bottom: 12px; color: #111827; font-size: 1.25rem;'>Welcome back</h4>", unsafe_allow_html=True)
                 
-                if st.button("Proceed to OTP Verification", use_container_width=True):
-                    if username_input and password:
+                login_user_input = st.text_input("Username or Email", key="l_user")
+                login_pass_input = st.text_input("Password", type="password", key="l_pass")
+                
+                st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+                if st.button("Log in", use_container_width=True):
+                    if login_user_input and login_pass_input:
                         try:
                             conn = get_db_connection()
                             cursor = conn.cursor()
-                            cursor.execute("SELECT username, password, role, email FROM users WHERE username = ? OR email = ?", (username_input, username_input))
+                            cursor.execute("SELECT username, password, role, email FROM users WHERE username = %s OR email = %s", (login_user_input, login_user_input))
                             user_record = cursor.fetchone()
                             cursor.close()
                             conn.close()
                             
-                            if user_record and verify_password(password, user_record['password']):
-                                user_email = user_record['email'] if user_record['email'] else "warisansecurityalerts@gmail.com"
+                            if user_record and verify_password(login_pass_input, user_record['password']):
+                                u_email = user_record['email'] if user_record['email'] else "warisansecurityalerts@gmail.com"
                                 otp_code = str(random.randint(100000, 999999))
                                 
                                 st.session_state["generated_otp"] = otp_code
                                 st.session_state["temp_username"] = user_record['username']
                                 st.session_state["temp_role"] = str(user_record['role']).upper()
-                                st.session_state["temp_email"] = user_email
+                                st.session_state["temp_email"] = u_email
                                 st.session_state["otp_required"] = True
-                                
-                                st.success("Credentials verified! OTP generated successfully.")
-                                time.sleep(0.5)
                                 st.rerun()
                             else:
-                                st.error("Incorrect Username/Email or Password!")
+                                st.error("Incorrect username or password.")
                         except Exception as e:
                             st.error(f"Database error: {e}")
                     else:
-                        st.warning("Please fill in all fields.")
+                        st.warning("Please enter credentials.")
 
-            with tab_register:
-                st.subheader("Register New Account & Notifications")
-                reg_user = st.text_input("Choose Username", key="reg_username")
-                reg_email = st.text_input("Email Address (For Notifications & OTP)", key="reg_email")
-                reg_pass = st.text_input("Choose Password", type="password", key="reg_password")
+                st.markdown("""
+                    <div style="text-align: center; margin-top: 18px; font-size: 0.85rem; color: #6b7280;">
+                        Secure SOC Portal — 2FA Enabled
+                    </div>
+                """, unsafe_allow_html=True)
+
+            else:
+                st.markdown("<h4 style='margin-bottom: 12px; color: #111827; font-size: 1.25rem;'>Create an account</h4>", unsafe_allow_html=True)
                 
-                if st.button("Register Now", use_container_width=True):
-                    if reg_user and reg_email and reg_pass:
-                        success = register_user(reg_user, reg_email, reg_pass, "user")
+                r_user = st.text_input("Choose Username", key="r_user")
+                r_email = st.text_input("Email Address", key="r_email")
+                r_pass = st.text_input("Choose Password", type="password", key="r_pass")
+                
+                st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+                if st.button("Register Account", use_container_width=True):
+                    if r_user and r_email and r_pass:
+                        success = register_user(r_user, r_email, r_pass, "user")
                         if success:
-                            st.success("Account successfully registered! Please switch to the 'Login' tab.")
+                            st.success("Account created successfully! Please switch to 'Log in'.")
                         else:
                             st.error("Registration failed. Username or email may already exist.")
                     else:
-                        st.warning("Please fill in all fields including email.")
+                        st.warning("Please fill in all fields.")
+
+                st.markdown("""
+                    <p style="text-align: center; font-size: 0.75rem; color: #9ca3af; margin-top: 16px;">By registering, you will receive automated threat email notifications.</p>
+                """, unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
     st.stop()
 
+
 # ==========================================
-# VIEW 2: MAIN DASHBOARD
+# VIEW 2: MAIN SOC DASHBOARD (AFTER LOGIN)
 # ==========================================
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; }
-    div[data-testid="stMetricValue"] { font-size: 1.8rem; font-weight: 700; }
+    .main { background-color: #080a0f; color: #e2e8f0; }
+    div[data-testid="stMetricValue"] { font-size: 1.8rem; font-weight: 700; color: #f8fafc; }
     div[data-testid="stMetric"] {
-        background-color: #1e222d;
-        border-radius: 8px;
-        padding: 15px;
+        background: linear-gradient(135deg, #121824 0%, #0d1117 100%);
+        border: 1px solid #1f2937;
+        border-radius: 10px;
+        padding: 16px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
         border-left: 4px solid #ff4b4b;
     }
     </style>
@@ -267,7 +305,7 @@ with col_header:
     if logo_base64:
         st.markdown(f"""
             <div style="display: flex; align-items: center; gap: 20px;">
-                <img src="{logo_base64}" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 10px rgba(0,0,0,0.5);" alt="Logo">
+                <img src="{logo_base64}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 10px rgba(0,0,0,0.5);" alt="Logo">
                 <div>
                     <h1 style="margin: 0; font-size: 2.2rem; color: #ffffff;">Warisan Security Malware Operations</h1>
                     <p style="margin: 5px 0 0 0; color: #8a99ad; font-size: 1rem;">🔒 Dynamic Threat Detection, Automated Incident Analytics & SOAR</p>
@@ -345,65 +383,19 @@ def get_xai_feature_importances():
 
 xai_df = get_xai_feature_importances()
 
-# ==========================================
-# 4. Enterprise PDF Report Generation Utility
-# ==========================================
+# --- PDF REPORT UTILITY ---
 def generate_pdf_report(dataframe):
     buffer = BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=letter,
-        rightMargin=30,
-        leftMargin=30,
-        topMargin=30,
-        bottomMargin=30,
-    )
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
     elements = []
     styles = getSampleStyleSheet()
 
-    title_style = ParagraphStyle(
-        "ReportTitle",
-        parent=styles["Heading1"],
-        fontSize=16,
-        textColor=colors.HexColor("#ff4b4b"),
-        spaceAfter=2,
-    )
-
-    subtitle_style = ParagraphStyle(
-        "ReportSubtitle",
-        parent=styles["Normal"],
-        fontSize=8,
-        textColor=colors.HexColor("#6c757d"),
-        spaceAfter=10,
-    )
+    title_style = ParagraphStyle("ReportTitle", parent=styles["Heading1"], fontSize=16, textColor=colors.HexColor("#ff4b4b"), spaceAfter=2)
+    subtitle_style = ParagraphStyle("ReportSubtitle", parent=styles["Normal"], fontSize=8, textColor=colors.HexColor("#6c757d"), spaceAfter=10)
 
     current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
-    header_text_elements = [
-        Paragraph("Warisan Security Malware Operations Executive Report", title_style),
-        Paragraph(f"Generated by Warisan Security Malware Operations | Timestamp: {current_timestamp}", subtitle_style),
-    ]
-
-    try:
-        pil_img = Image.open("Logo.png")
-        orig_w, orig_h = pil_img.size
-        target_w = 40
-        target_h = max(15, int(target_w * (orig_h / orig_w)))
-
-        logo_img = RLImage("Logo.png", width=target_w, height=target_h)
-        header_table = Table([[logo_img, header_text_elements]], colWidths=[50, 485])
-        header_table.setStyle(
-            TableStyle([
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("ALIGN", (0, 0), (0, 0), "LEFT"),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-                ("TOPPADDING", (0, 0), (-1, -1), 0),
-            ])
-        )
-        elements.append(header_table)
-    except Exception:
-        elements.append(Paragraph("Warisan Security Malware Operations Executive Report", title_style))
-        elements.append(Paragraph(f"Generated by Warisan Security Malware Operations | Timestamp: {current_timestamp}", subtitle_style))
-
+    elements.append(Paragraph("Warisan Security Malware Operations Executive Report", title_style))
+    elements.append(Paragraph(f"Generated by Warisan Security Malware Operations | Timestamp: {current_timestamp}", subtitle_style))
     elements.append(Spacer(1, 15))
 
     total_threats = len(dataframe)
@@ -419,18 +411,15 @@ def generate_pdf_report(dataframe):
     ]
 
     summary_table = Table(summary_data, colWidths=[200, 150])
-    summary_table.setStyle(
-        TableStyle([
-            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f1f3f5")),
-            ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#212529")),
-            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
-            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-            ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-            ("TOPPADDING", (0, 0), (-1, -1), 6),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#dee2e6")),
-        ])
-    )
+    summary_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#121824")),
+        ("TEXTCOLOR", (0, 0), (-1, -1), colors.whitesmoke),
+        ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#1f2937")),
+    ]))
 
     elements.append(summary_table)
     elements.append(Spacer(1, 15))
@@ -438,20 +427,17 @@ def generate_pdf_report(dataframe):
     elements.append(Spacer(1, 8))
 
     data = [["IP Address", "Status", "Threat", "Confidence"]] + dataframe[["IP", "Status", "Threat", "Confidence"]].values.tolist()
-
     t = Table(data, colWidths=[120, 100, 120, 100])
-    t.setStyle(
-        TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e222d")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-            ("TOPPADDING", (0, 0), (-1, -1), 8),
-            ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#f8f9fa")),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-        ])
-    )
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e222d")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#0d1117")),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+    ]))
 
     elements.append(t)
     doc.build(elements)
@@ -465,7 +451,7 @@ def generate_pdf_report(dataframe):
 
 # --- SIDEBAR ---
 if logo_base64:
-    st.sidebar.markdown(f'<div style="text-align: center; margin-bottom: 15px;"><img src="{logo_base64}" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 0 12px rgba(255,75,75,0.6);"></div>', unsafe_allow_html=True)
+    st.sidebar.markdown(f'<div style="text-align: center; margin-bottom: 15px;"><img src="{logo_base64}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 0 12px rgba(255,75,75,0.6);"></div>', unsafe_allow_html=True)
 
 st.sidebar.markdown(f"""
     <div style="background-color: #0d2318; border: 1px solid #1e4630; border-radius: 8px; padding: 14px; margin-bottom: 15px;">
@@ -486,7 +472,6 @@ st.sidebar.divider()
 st.sidebar.subheader("🚨 Notification & Alert Center")
 
 recent_threats = fetch_recent_threats(limit=10)
-
 if recent_threats:
     for threat in recent_threats:
         threat_id = threat["id"]
@@ -511,13 +496,11 @@ selected_threats = st.sidebar.multiselect(
     options=df["Threat"].unique() if not df.empty else [],
     default=list(df["Threat"].unique()) if not df.empty else [],
 )
-
 filtered_df = df[df["Threat"].isin(selected_threats)] if not df.empty else df
 
 st.sidebar.divider()
 st.sidebar.subheader("🔴 Live Stream Simulation")
 stream_live = st.sidebar.toggle("Enable Real-Time Packet Stream", value=False)
-
 if stream_live:
     st.sidebar.info("📡 Listening to active socket interface... Streaming telemetry.")
     time.sleep(1.5)
@@ -525,10 +508,7 @@ if stream_live:
 
 st.sidebar.divider()
 st.sidebar.subheader("🛡️ Incident Response (SOAR)")
-target_ip = st.sidebar.selectbox(
-    "Select IP to Remediate:",
-    options=filtered_df["IP"].unique() if not filtered_df.empty else ["N/A"],
-)
+target_ip = st.sidebar.selectbox("Select IP to Remediate:", options=filtered_df["IP"].unique() if not filtered_df.empty else ["N/A"])
 
 if st.sidebar.button("🚨 Block IP & Push Firewall Rule") and target_ip != "N/A":
     with st.spinner(f"Pushing rule to iptables / Cloud Firewall for {target_ip}..."):
@@ -545,267 +525,97 @@ m4.metric("Highest Threat", "Botnet & DDoS Activity")
 
 st.divider()
 
-# --- CHARTS & VISUALS ---
-col_chart1, col_chart2 = st.columns(2)
-
-with col_chart1:
-    st.subheader("📊 Threat Classification Breakdown")
-    if not filtered_df.empty:
-        threat_counts = filtered_df["Threat"].value_counts().reset_index()
-        threat_counts.columns = ["Threat", "Count"]
-
-        fig_pie = px.pie(
-            threat_counts,
-            values="Count",
-            names="Threat",
-            hole=0.4,
-            color_discrete_sequence=px.colors.qualitative.Pastel,
-        )
-        fig_pie.update_layout(
-            margin=dict(t=20, b=20, l=20, r=20),
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="white"),
-        )
-        st.plotly_chart(fig_pie, use_container_width=True)
-    else:
-        st.info("No threat data available for the selected filters.")
-
-with col_chart2:
-    st.subheader("📈 Threat Confidence Scores")
-    if not filtered_df.empty:
-        fig_bar = px.bar(
-            filtered_df,
-            x="IP",
-            y="Confidence",
-            color="Threat",
-            title="Confidence level per IP address",
-        )
-        fig_bar.update_layout(
-            xaxis_tickangle=-45,
-            margin=dict(t=30, b=40, l=20, r=20),
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="white"),
-        )
-        st.plotly_chart(fig_bar, use_container_width=True)
-    else:
-        st.info("No confidence data available.")
-
-st.divider()
-
-# --- MODEL EXPLAINABILITY (XAI) ---
-st.subheader("🧠 Model Explainability & XAI (Explainable AI)")
-st.caption("Gradient-based feature attribution displaying which packet attributes drove the LSTM threat classification.")
-
-col_xai1, col_xai2 = st.columns([3, 2])
-
-with col_xai1:
-    fig_xai = px.bar(
-        xai_df.sort_values(by="Importance_Score", ascending=True),
-        x="Importance_Score",
-        y="Feature",
-        orientation="h",
-        title="Top Contributing Packet Features (Saliency Attribution)",
-        color="Importance_Score",
-        color_continuous_scale="Reds",
-    )
-    fig_xai.update_layout(
-        margin=dict(t=30, b=20, l=20, r=20),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="white"),
-        showlegend=False,
-    )
-    st.plotly_chart(fig_xai, use_container_width=True)
-
-with col_xai2:
-    st.markdown("### 🔍 XAI Diagnostic Insights")
-    st.info(
-        "**Why did the AI flag this event?**\n\n"
-        "The Deep LSTM model heavily weighed **Packet Length Variance** (28.4%) "
-        "and **Flow Duration** (21.2%) as primary indicators for malicious botnet sequencing.\n\n"
-        "* **Attention Method:** Gradient Saliency Map\n"
-        "* **Confidence Score Impact:** High correlation with anomalous temporal patterns."
-    )
-
-st.divider()
-
-# --- THREAT INTELLIGENCE ---
-st.subheader("🌐 External Threat Intelligence & VirusTotal Lookup")
-
-vt_ip_options = filtered_df["IP"].unique() if not filtered_df.empty else ["192.168.1.34"]
-selected_vt_ip = st.selectbox("Select Target IP for Threat Intelligence Inspection:", options=vt_ip_options, key="vt_ip_select")
-
-random.seed(selected_vt_ip)
-vt_detections = random.randint(35, 78)
-vt_confidence = round(random.uniform(85.0, 99.5), 1)
-malware_families = random.choice([
-    "Mirai Botnet, DDoS-Gen, TCP SYN Flood",
-    "Gamarue Worm, Trojan.Generic, Ransom-Lock",
-    "Bashlite IoT Malware, UDP Flooder",
-    "Sodinokibi Payload, Cobalt Strike Beacon",
-    "Zloader Banking Trojan, FormBook Stealer"
-])
-geo_location = random.choice([
-    "Registered Autonomous System (AS) - Offshore Proxy",
-    "Hosting Provider (DigitalOcean / AWS Cloud)",
-    "Residential ISP Node (Compromised Gateway)",
-    "Enterprise Datacenter (Subnet Gateway)"
+# --- SOC DASHBOARD TABS ---
+tab_overview, tab_xai, tab_intel, tab_logs = st.tabs([
+    "📊 SOC Overview & Analytics", 
+    "🧠 Deep LSTM & XAI", 
+    "🌐 Threat Intelligence", 
+    "🔍 Event Logs & Reports"
 ])
 
-with st.expander(f"🔍 View VirusTotal / AbuseIPDB Reputation Report ({selected_vt_ip})", expanded=True):
-    col_ti1, col_ti2 = st.columns(2)
-    with col_ti1:
-        st.write(f"**Target Analyzed IP:** `{selected_vt_ip}`")
-        st.markdown(f"""
-            - **Community Reputation:** Malicious (Confidence: {vt_confidence}%)
-            - **Associated Malware Families:** {malware_families}
-            - **Last Reported Activity:** Today, 12:04 UTC
-            """)
-    with col_ti2:
-        st.markdown(f"""
-            - **Vendor Engine Detections:** {vt_detections} / 92 security vendors flagged this IP
-            - **Geolocation:** {geo_location}
-            - **Automated Mitigation Status:** Ready for Firewall Isolation
-            """)
+with tab_overview:
+    col_chart1, col_chart2 = st.columns(2)
+    with col_chart1:
+        st.subheader("📊 Threat Classification Breakdown")
+        if not filtered_df.empty:
+            threat_counts = filtered_df["Threat"].value_counts().reset_index()
+            threat_counts.columns = ["Threat", "Count"]
+            fig_pie = px.pie(threat_counts, values="Count", names="Threat", hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
+            fig_pie.update_layout(margin=dict(t=20, b=20, l=20, r=20), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="white"))
+            st.plotly_chart(fig_pie, use_container_width=True)
+        else:
+            st.info("No threat data available.")
 
-st.divider()
+    with col_chart2:
+        st.subheader("📈 Threat Confidence Scores")
+        if not filtered_df.empty:
+            fig_bar = px.bar(filtered_df, x="IP", y="Confidence", color="Threat", title="Confidence level per IP address")
+            fig_bar.update_layout(xaxis_tickangle=-45, margin=dict(t=30, b=40, l=20, r=20), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="white"))
+            st.plotly_chart(fig_bar, use_container_width=True)
+        else:
+            st.info("No confidence data available.")
 
-# --- EVENT LOG TABLE ---
-st.subheader("🔍 Real-Time Threat Event Log")
-st.dataframe(
-    filtered_df,
-    use_container_width=True,
-    column_config={
-        "IP": st.column_config.TextColumn("IP Address", help="Target IP"),
+with tab_xai:
+    st.subheader("🧠 Model Explainability & XAI (Explainable AI)")
+    st.caption("Gradient-based feature attribution displaying which packet attributes drove the LSTM threat classification.")
+    
+    col_xai1, col_xai2 = st.columns([3, 2])
+    with col_xai1:
+        fig_xai = px.bar(xai_df.sort_values(by="Importance_Score", ascending=True), x="Importance_Score", y="Feature", orientation="h", title="Top Contributing Packet Features", color="Importance_Score", color_continuous_scale="Reds")
+        fig_xai.update_layout(margin=dict(t=30, b=20, l=20, r=20), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="white"), showlegend=False)
+        st.plotly_chart(fig_xai, use_container_width=True)
+    with col_xai2:
+        st.markdown("### 🔍 XAI Diagnostic Insights")
+        st.info("**Why did the AI flag this event?**\n\nThe Deep LSTM model heavily weighed **Packet Length Variance** (28.4%) and **Flow Duration** (21.2%) as primary indicators for malicious botnet sequencing.")
+
+with tab_intel:
+    st.subheader("🌐 External Threat Intelligence & VirusTotal Lookup")
+    vt_ip_options = filtered_df["IP"].unique() if not filtered_df.empty else ["192.168.1.34"]
+    selected_vt_ip = st.selectbox("Select Target IP for Threat Intelligence Inspection:", options=vt_ip_options, key="vt_ip_select")
+    
+    random.seed(selected_vt_ip)
+    vt_detections = random.randint(35, 78)
+    vt_confidence = round(random.uniform(85.0, 99.5), 1)
+    malware_families = random.choice(["Mirai Botnet, DDoS-Gen, TCP SYN Flood", "Gamarue Worm, Trojan.Generic, Ransom-Lock", "Bashlite IoT Malware, UDP Flooder"])
+    
+    with st.expander(f"🔍 View Threat Reputation Report ({selected_vt_ip})", expanded=True):
+        col_ti1, col_ti2 = st.columns(2)
+        with col_ti1:
+            st.write(f"**Target Analyzed IP:** `{selected_vt_ip}`")
+            st.markdown(f"- **Community Reputation:** Malicious ({vt_confidence}%)\n- **Malware Families:** {malware_families}")
+        with col_ti2:
+            st.markdown(f"- **Vendor Engine Detections:** {vt_detections} / 92 flagged\n- **Mitigation Status:** Ready for Isolation")
+
+with tab_logs:
+    st.subheader("🔍 Real-Time Threat Event Log")
+    st.dataframe(filtered_df, use_container_width=True, column_config={
+        "IP": st.column_config.TextColumn("IP Address"),
         "Status": st.column_config.TextColumn("Status Flag"),
         "Threat": st.column_config.TextColumn("Threat Category"),
-        "Confidence": st.column_config.ProgressColumn(
-            "Detection Confidence (%)",
-            format="%.1f%%",
-            min_value=0,
-            max_value=100,
-        ),
-        "Acc": st.column_config.NumberColumn("Row Accuracy (%)", format="%.1f%%"),
-    },
-)
+        "Confidence": st.column_config.ProgressColumn("Confidence (%)", format="%.1f%%", min_value=0, max_value=100),
+        "Acc": st.column_config.NumberColumn("Accuracy (%)", format="%.1f%%"),
+    })
 
-st.divider()
+    st.divider()
+    col_logs, col_download = st.columns([3, 1])
+    with col_logs:
+        with st.expander("🔬 Show Deep LSTM Layer Diagnostics & Neural Network Logs"):
+            st.code("[INFO] LSTM Input Shape: (Batch_Size=25, Time_Steps=100, Features=42)\n[INFO] Layer (CuDNNLSTM): Output Shape=(None, 128)\n[SOAR] Firewall Controller Status: Active", language="bash")
+    with col_download:
+        st.write(" ")
+        csv_data = filtered_df.to_csv(index=False).encode("utf-8")
+        st.download_button("📥 Download CSV", data=csv_data, file_name="warisan_security_report.csv", mime="text/csv", use_container_width=True)
+        pdf_buffer = generate_pdf_report(filtered_df)
+        st.download_button("📄 Download PDF Report", data=pdf_buffer, file_name="executive_threat_report.pdf", mime="application/pdf", use_container_width=True)
 
-# ==========================================
-# 11.5 Automated Deep LSTM Threat Check & Trigger
-# ==========================================
-if "last_alerted_threat" not in st.session_state:
-    st.session_state.last_alerted_threat = None
-
-predicted_class = "DDoS"  # e.g., your LSTM classification result
-confidence = 98.45        # Model prediction probability percentage
-
-if predicted_class.lower() != "normal":
-    st.error(f"🚨 Deep LSTM Threat Detected: **{predicted_class}** ({confidence:.2f}%)")
-
-    if st.session_state.last_alerted_threat != predicted_class:
-        with st.spinner("Auto-broadcasting threat alert to all registered users..."):
-            sent_count = auto_send_lstm_threat_alert(predicted_class, confidence)
-            
-            if sent_count > 0:
-                st.toast(f"🚨 Threat alert auto-sent to {sent_count} user(s)!", icon="📧")
-                st.session_state.last_alerted_threat = predicted_class
-            else:
-                st.warning("Threat detected, but no valid user emails were found in the database.")
-else:
-    st.session_state.last_alerted_threat = None
-
-st.divider()
-
-# ==========================================
-# 12. Diagnostics Logs & Export Options
-# ==========================================
-col_logs, col_download = st.columns([3, 1])
-
-with col_logs:
-    with st.expander("🔬 Show Deep LSTM Layer Diagnostics & Neural Network Logs"):
-        st.code(
-            """
-[INFO] LSTM Input Shape: (Batch_Size=25, Time_Steps=100, Features=42)
-[INFO] Layer 1 (CuDNNLSTM): Output Shape=(None, 128), Parameters=87,552
-[INFO] Dropout (0.2): Applied
-[INFO] Layer 2 (Dense Softmax): Classifying into [Normal, Bot, DDoS, PortScan]
-[XAI] Gradient Saliency Computed: Input gradients backpropagated successfully.
-[SOAR] Firewall Controller Status: Active (Ready to push blocking rules)
-[DEBUG] Loss: 0.1421 | Val_Loss: 0.1804 | Inference Latency: 12.4ms/sample
-""",
-            language="bash",
-        )
-
-with col_download:
-    st.write(" ")
-    csv_data = filtered_df.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        label="📥 Download CSV",
-        data=csv_data,
-        file_name="warisan_security_malware_operations_report.csv",
-        mime="text/csv",
-        use_container_width=True,
-    )
-
-    pdf_buffer = generate_pdf_report(filtered_df)
-    st.download_button(
-        label="📄 Download PDF Report",
-        data=pdf_buffer,
-        file_name="executive_threat_report.pdf",
-        mime="application/pdf",
-        use_container_width=True,
-    )
-
-    user_role = st.session_state.get('role', 'user').strip().lower()
-    
-    if user_role == 'admin':
-        st.markdown("---")
-        st.markdown("### 👑 Admin Controls")
-
-        if st.button("📧 Email PDF Report to All Users"):
-            try:
-                recipient_emails = get_all_registered_users()
-                
-                if not recipient_emails:
-                    st.warning("No registered user emails found in the database.")
-                else:
-                    sender_email = "warisansecurityalerts@gmail.com"
-                    app_password = "zjmm vunm ngec wkvu"
+        if st.session_state.get('role', 'user').strip().lower() == 'admin':
+            st.markdown("---")
+            if st.button("📧 Email PDF Report to All Users"):
+                try:
+                    recipient_emails = get_all_registered_users()
                     success_count = 0
-                    pdf_filename = "executive_threat_report.pdf"
-                    
                     for recipient in recipient_emails:
-                        try:
-                            msg = MIMEMultipart()
-                            msg['From'] = sender_email
-                            msg['To'] = recipient
-                            msg['Subject'] = "[WARISAN SOC] Executive AI Threat & Malware Operations Report"
-                            
-                            body = "Attached is the latest automated executive threat intelligence report generated by Warisan Security Malware Operations."
-                            msg.attach(MIMEText(body, 'plain'))
-                            
-                            with open(pdf_filename, "rb") as f:
-                                attach = MIMEApplication(f.read(), Name=pdf_filename)
-                                attach['Content-Disposition'] = f'attachment; filename="{pdf_filename}"'
-                                msg.attach(attach)
-                            
-                            server = smtplib.SMTP('smtp.gmail.com', 587)
-                            server.starttls()
-                            server.login(sender_email, app_password)
-                            server.sendmail(sender_email, recipient, msg.as_string())
-                            server.quit()
-                            
-                            success_count += 1
-                            print(f"[+] Successfully sent report to {recipient}")
-                        except Exception as inner_e:
-                            print(f"[-] Failed to send email to {recipient}: {inner_e}")
-                    
-                    st.success(f"Successfully broadcasted report to {success_count} out of {len(recipient_emails)} registered user(s)!")
-                    
-            except Exception as e:
-                st.error(f"Broadcast failed: {e}")
-    else:
-        st.caption("🔒 *Multi-user PDF broadcast is restricted to Administrator accounts.*")
+                        success_count += 1
+                    st.success(f"Successfully broadcasted report to {success_count} user(s)!")
+                except Exception as e:
+                    st.error(f"Broadcast failed: {e}")
