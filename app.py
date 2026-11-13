@@ -39,13 +39,31 @@ st.set_page_config(
     layout="wide",
 )
 
+# --- REMOVE EXCESS TOP PADDING & GLOBAL STYLING ---
+st.markdown("""
+    <style>
+    .block-container {
+        padding-top: 1.5rem !important;
+        padding-bottom: 0rem !important;
+    }
+    .main { background-color: #080a0f; color: #e2e8f0; }
+    div[data-testid="stMetricValue"] { font-size: 1.8rem; font-weight: 700; color: #f8fafc; }
+    div[data-testid="stMetric"] {
+        background: linear-gradient(135deg, #121824 0%, #0d1117 100%);
+        border: 1px solid #1f2937;
+        border-radius: 10px;
+        padding: 16px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        border-left: 4px solid #ff4b4b;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- GLOBAL SESSION STATE INITIALIZATION ---
 if "user_email" not in st.session_state:
     st.session_state["user_email"] = None
-
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
-
 if "username" not in st.session_state:
     st.session_state["username"] = ""
 if "role" not in st.session_state:
@@ -60,7 +78,6 @@ if "temp_role" not in st.session_state:
     st.session_state["temp_role"] = ""
 if "temp_email" not in st.session_state:
     st.session_state["temp_email"] = ""
-
 if "last_alerted_threat" not in st.session_state:
     st.session_state.last_alerted_threat = None
 
@@ -81,15 +98,14 @@ logo_base64 = get_base64_image("Logo.png")
 # PASSWORD VERIFICATION HELPER
 # ==========================================
 def verify_password(plain_password, stored_password):
-    """Verify plain password against stored database password."""
     return plain_password == stored_password
 
 # ==========================================
 # AUTOMATED EMAIL & ALERT FUNCTIONS
 # ==========================================
 def auto_send_lstm_threat_alert(threat_label, confidence_score=None):
-    """Automatically emails ALL registered users when the Deep LSTM model flags a threat."""
     recipient_emails = get_all_registered_users()
+    recipient_emails = list(set([e.lower().strip() for e in recipient_emails if e and "@" in e]))
     
     if not recipient_emails:
         return 0
@@ -97,16 +113,19 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=None):
     SENDER_EMAIL = "warisansecurityalerts@gmail.com"
     SENDER_PASSWORD = "zjmm vunm ngec wkvu"
 
-    subject = f"🚨 SECURITY ALERT: {threat_label} Detected!"
+    subject = f"🚨 [WARISAN SOC] SECURITY ALERT: {threat_label} Detected!"
     conf_text = f"\nModel Confidence: {confidence_score:.2f}%" if confidence_score else ""
     
     body = f"""
-    WARNING: The Deep LSTM Intrusion Detection System has detected a potential threat.
+    WARNING: The Warisan Security Malware Operations Deep LSTM Intrusion Detection System has detected a critical network threat.
 
     Threat Classification: {threat_label}{conf_text}
-    Database Source: Cloud SQLite Database
+    Timestamp: {datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")}
 
-    Please check the security dashboard immediately for detailed logs and mitigation steps.
+    Please log in to the security dashboard immediately to review incident logs, examine XAI feature attribution, and execute SOAR firewall isolation.
+
+    --
+    Warisan Security Operations Center (SOC) Automated Notification Service
     """
 
     sent_count = 0
@@ -116,18 +135,22 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=None):
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
 
         for email in recipient_emails:
-            msg = MIMEMultipart()
-            msg["From"] = SENDER_EMAIL
-            msg["To"] = email
-            msg["Subject"] = subject
-            msg.attach(MIMEText(body, "plain"))
+            try:
+                msg = MIMEMultipart()
+                msg["From"] = SENDER_EMAIL
+                msg["To"] = email
+                msg["Subject"] = subject
+                msg.attach(MIMEText(body, "plain"))
 
-            server.sendmail(SENDER_EMAIL, email, msg.as_string())
-            sent_count += 1
+                server.sendmail(SENDER_EMAIL, email, msg.as_string())
+                sent_count += 1
+                print(f"[+] Alert successfully sent to: {email}")
+            except Exception as inner_e:
+                print(f"[-] Failed to send alert to {email}: {inner_e}")
 
         server.quit()
     except Exception as e:
-        print(f"Failed to send auto-alert email: {e}")
+        print(f"[-] SMTP Connection failed: {e}")
 
     return sent_count
 
@@ -144,10 +167,10 @@ if not st.session_state["logged_in"]:
     logo_html = f'<img src="{logo_base64}" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 10px rgba(0,0,0,0.5); margin-bottom: 12px;" alt="Logo">' if logo_base64 else '<span style="font-size: 3rem;">🛡️</span>'
 
     st.markdown(f"""
-        <div style="text-align: center; padding: 20px;">
+        <div style="text-align: center; padding: 10px 20px 20px 20px;">
             {logo_html}
-            <h1 style="color: #ff4b4b; margin: 0;">Warisan Security Malware Operations</h1>
-            <p style="color: #8a99ad; font-size: 1.1rem; margin-top: 5px;">Please Login, Enter OTP, or Register an Account to Access the AI Dashboard</p>
+            <h1 style="color: #ff4b4b; margin: 0; font-size: 2.2rem;">Warisan Security Malware Operations</h1>
+            <p style="color: #8a99ad; font-size: 1.05rem; margin-top: 5px;">Please Login, Enter OTP, or Register an Account to Access the AI Dashboard</p>
         </div>
     """, unsafe_allow_html=True)
 
@@ -157,8 +180,7 @@ if not st.session_state["logged_in"]:
             st.info(f"🔒 A security verification code (OTP) has been generated for: **{st.session_state['temp_email']}**")
             st.warning(f"🔑 **[CLOUD BYPASS DEBUG] Your Active OTP Code is:** `{st.session_state['generated_otp']}`")
             
-            st.subheader("Enter 6-Digit OTP Code")
-            entered_otp = st.text_input("Enter OTP Code", type="password", key="otp_input")
+            entered_otp = st.text_input("Enter 6-Digit OTP Code", type="password", key="otp_input")
             
             c_otp1, c_otp2 = st.columns(2)
             with c_otp1:
@@ -199,7 +221,7 @@ if not st.session_state["logged_in"]:
                         try:
                             conn = get_db_connection()
                             cursor = conn.cursor()
-                            cursor.execute("SELECT username, password, role, email FROM users WHERE username = ? OR email = ?", (username_input, username_input))
+                            cursor.execute("SELECT username, password, role, email FROM users WHERE username = %s OR email = %s", (username_input, username_input))
                             user_record = cursor.fetchone()
                             cursor.close()
                             conn.close()
@@ -245,19 +267,6 @@ if not st.session_state["logged_in"]:
 # ==========================================
 # VIEW 2: MAIN DASHBOARD
 # ==========================================
-st.markdown("""
-    <style>
-    .main { background-color: #0e1117; }
-    div[data-testid="stMetricValue"] { font-size: 1.8rem; font-weight: 700; }
-    div[data-testid="stMetric"] {
-        background-color: #1e222d;
-        border-radius: 8px;
-        padding: 15px;
-        border-left: 4px solid #ff4b4b;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
 if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
     st.session_state.role = "admin"
 
@@ -267,7 +276,7 @@ with col_header:
     if logo_base64:
         st.markdown(f"""
             <div style="display: flex; align-items: center; gap: 20px;">
-                <img src="{logo_base64}" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 10px rgba(0,0,0,0.5);" alt="Logo">
+                <img src="{logo_base64}" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 10px rgba(0,0,0,0.5);" alt="Logo">
                 <div>
                     <h1 style="margin: 0; font-size: 2.2rem; color: #ffffff;">Warisan Security Malware Operations</h1>
                     <p style="margin: 5px 0 0 0; color: #8a99ad; font-size: 1rem;">🔒 Dynamic Threat Detection, Automated Incident Analytics & SOAR</p>
@@ -346,7 +355,7 @@ def get_xai_feature_importances():
 xai_df = get_xai_feature_importances()
 
 # ==========================================
-# 4. Enterprise PDF Report Generation Utility
+# ENTERPRISE PDF REPORT GENERATION UTILITY
 # ==========================================
 def generate_pdf_report(dataframe):
     buffer = BytesIO()
@@ -694,13 +703,13 @@ st.dataframe(
 st.divider()
 
 # ==========================================
-# 11.5 Automated Deep LSTM Threat Check & Trigger
+# AUTOMATED DEEP LSTM THREAT CHECK & TRIGGER
 # ==========================================
 if "last_alerted_threat" not in st.session_state:
     st.session_state.last_alerted_threat = None
 
-predicted_class = "DDoS"  # e.g., your LSTM classification result
-confidence = 98.45        # Model prediction probability percentage
+predicted_class = "DDoS"
+confidence = 98.45
 
 if predicted_class.lower() != "normal":
     st.error(f"🚨 Deep LSTM Threat Detected: **{predicted_class}** ({confidence:.2f}%)")
@@ -720,7 +729,7 @@ else:
 st.divider()
 
 # ==========================================
-# 12. Diagnostics Logs & Export Options
+# DIAGNOSTICS LOGS & EXPORT OPTIONS
 # ==========================================
 col_logs, col_download = st.columns([3, 1])
 
