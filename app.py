@@ -48,12 +48,23 @@ st.markdown('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs
 st.markdown("""
     <style>
     .block-container {
-        padding-top: 3.5rem !important;
+        padding-top: 2rem !important;
         padding-bottom: 0rem !important;
     }
     .stApp {
         background: radial-gradient(circle at 50% 30%, #121826 0%, #080a0f 70%);
         color: #e2e8f0;
+    }
+
+    /* Hide specific top-right header action buttons (Share, Star, Edit, GitHub) while keeping the 3-dot menu */
+    button[data-testid="baseButton-header"],
+    button[kind="header"],
+    .stAppToolbar button:not(:last-child) {
+        display: none !important;
+    }
+    
+    header[data-testid="stHeader"] {
+        background: transparent !important;
     }
 
     /* Modern SOC Auth Card Container */
@@ -783,7 +794,7 @@ def generate_pdf_report(dataframe):
 if logo_base64:
     st.sidebar.markdown(f'<div style="text-align: center; margin-bottom: 12px;"><img src="{logo_base64}" style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 0 12px rgba(255,75,75,0.6);"></div>', unsafe_allow_html=True)
 
-# --- MOVED USER PROFILE & REFRESH BUTTONS INTO LEFT SIDEBAR ---
+# --- USER PROFILE & REFRESH BUTTONS IN LEFT SIDEBAR ---
 with st.sidebar.expander("👤 User Profile & Session", expanded=True):
     st.markdown(f"""
         <div style="background-color: #0d2318; border: 1px solid #1e4630; border-radius: 8px; padding: 10px; margin-bottom: 10px;">
