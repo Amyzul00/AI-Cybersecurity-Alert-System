@@ -856,7 +856,7 @@ with st.sidebar.expander("🛡️ Incident Response (SOAR)", expanded=False):
         handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated (User: {st.session_state['username']}).", is_critical=True)
         st.success(f"Successfully isolated host {target_ip}!")
 
-# --- ADMIN CONTROLS IN SIDEBAR (ICON REMOVED) ---
+# --- ADMIN CONTROLS IN SIDEBAR WITH DOWNLOAD BUTTONS ---
 user_role = st.session_state.get('role', 'user').strip().lower()
 if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
     user_role = "admin"
@@ -906,8 +906,26 @@ if user_role == 'admin':
                 
         except Exception as e:
             st.error(f"Broadcast failed: {e}")
+
+    csv_data = filtered_df.to_csv(index=False).encode("utf-8")
+    st.sidebar.download_button(
+        label="📥 Download CSV",
+        data=csv_data,
+        file_name="warisan_security_malware_operations_report.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+
+    pdf_buffer = generate_pdf_report(filtered_df)
+    st.sidebar.download_button(
+        label="📄 Download PDF Report",
+        data=pdf_buffer,
+        file_name="executive_threat_report.pdf",
+        mime="application/pdf",
+        use_container_width=True,
+    )
 else:
-    st.sidebar.caption("🔒 *Multi-user PDF broadcast is restricted to Administrator accounts.*")
+    st.sidebar.caption("🔒 *Admin controls & report downloads are restricted to Administrator accounts.*")
 
 # --- METRICS ROW ---
 m1, m2, m3, m4 = st.columns(4)
@@ -1091,14 +1109,11 @@ else:
 st.divider()
 
 # ==========================================
-# DIAGNOSTICS LOGS & EXPORT OPTIONS (ADMIN ONLY)
+# DIAGNOSTICS LOGS
 # ==========================================
-col_logs, col_download = st.columns([3, 1])
-
-with col_logs:
-    with st.expander("🔬 Show Deep LSTM Layer Diagnostics & Neural Network Logs"):
-        st.code(
-            """
+with st.expander("🔬 Show Deep LSTM Layer Diagnostics & Neural Network Logs"):
+    st.code(
+        """
 [INFO] LSTM Input Shape: (Batch_Size=25, Time_Steps=100, Features=42)
 [INFO] Layer 1 (CuDNNLSTM): Output Shape=(None, 128), Parameters=87,552
 [INFO] Dropout (0.2): Applied
@@ -1107,31 +1122,8 @@ with col_logs:
 [SOAR] Firewall Controller Status: Active (Ready to push blocking rules)
 [DEBUG] Loss: 0.1421 | Val_Loss: 0.1804 | Inference Latency: 12.4ms/sample
 """,
-            language="bash",
-        )
-
-with col_download:
-    st.write(" ")
-    if user_role == 'admin':
-        csv_data = filtered_df.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            label="📥 Download CSV",
-            data=csv_data,
-            file_name="warisan_security_malware_operations_report.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
-
-        pdf_buffer = generate_pdf_report(filtered_df)
-        st.download_button(
-            label="📄 Download PDF Report",
-            data=pdf_buffer,
-            file_name="executive_threat_report.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-        )
-    else:
-        st.caption("🔒 *CSV & PDF downloads are restricted to Administrator accounts.*")
+        language="bash",
+    )
 
 # --- FOOTER ---
 st.markdown("""
