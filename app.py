@@ -44,7 +44,7 @@ st.set_page_config(
 # --- FONT AWESOME CDN FOR SIDEBAR ICONS ---
 st.markdown('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">', unsafe_allow_html=True)
 
-# --- ELITE SOC AUTH & GLOBAL STYLING (HIDING STREAMLIT DEFAULT TOP-RIGHT TOOLBAR) ---
+# --- ELITE SOC AUTH & GLOBAL STYLING ---
 st.markdown("""
     <style>
     .block-container {
@@ -54,17 +54,6 @@ st.markdown("""
     .stApp {
         background: radial-gradient(circle at 50% 30%, #121826 0%, #080a0f 70%);
         color: #e2e8f0;
-    }
-
-    /* Hide default Streamlit top-right toolbar (Share, Star, Edit, etc.) */
-    header[data-testid="stHeader"] {
-        background: transparent !important;
-    }
-    .stAppToolbar {
-        display: none !important;
-    }
-    button[data-testid="baseButton-header"] {
-        display: none !important;
     }
 
     /* Modern SOC Auth Card Container */
@@ -217,7 +206,7 @@ def send_welcome_email(recipient_email, username):
     
     subject = "🛡️ [WARISAN SOC] Account Successfully Registered"
     logo_b64 = get_base64_image("Logo.png")
-    logo_img_tag = f'<img src="{logo_b64}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b;" alt="Logo">' if logo_b64 else '<span style="font-size: 2rem;">🛡️</span>'
+    logo_img_tag = f'<img src="{logo_b64}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b;" alt="Logo">' if logo_b64 else '<span style="font-size: 2rem;">🛡️</span>'
 
     html_body = f"""
     <!DOCTYPE html>
@@ -226,103 +215,93 @@ def send_welcome_email(recipient_email, username):
         <meta charset="UTF-8">
         <style>
             body {{
-                background-color: #080a0f;
+                background-color: #0f172a;
                 color: #e2e8f0;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                font-family: Arial, sans-serif;
                 margin: 0;
-                padding: 40px 0;
-            }}
-            .email-wrapper {{
-                width: 100%;
-                table-layout: fixed;
-                background-color: #080a0f;
-                padding-bottom: 40px;
+                padding: 20px;
             }}
             .email-content {{
-                max-width: 600px;
+                max-width: 580px;
                 margin: 0 auto;
-                background: linear-gradient(145deg, #121824 0%, #0b0f17 100%);
-                border-radius: 16px;
-                border: 1px solid rgba(255, 75, 75, 0.3);
-                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-                padding: 40px;
+                background-color: #1e293b;
+                border-radius: 12px;
+                border: 1px solid #334155;
+                padding: 30px;
             }}
             .header {{
-                border-bottom: 1px solid #1f2937;
-                padding-bottom: 20px;
-                margin-bottom: 24px;
+                border-bottom: 1px solid #334155;
+                padding-bottom: 15px;
+                margin-bottom: 20px;
             }}
             .title {{
-                font-size: 1.25rem;
-                font-weight: 700;
+                font-size: 1.2rem;
+                font-weight: bold;
                 color: #ffffff;
                 margin: 0;
             }}
             .subtitle {{
-                font-size: 0.8rem;
+                font-size: 0.75rem;
                 color: #94a3b8;
-                margin: 4px 0 0 0;
+                margin: 2px 0 0 0;
             }}
             .greeting {{
-                font-size: 1.1rem;
-                font-weight: 600;
+                font-size: 1rem;
+                font-weight: bold;
                 color: #f8fafc;
-                margin-bottom: 16px;
-            }}
-            .message {{
-                font-size: 0.95rem;
-                color: #cbd5e1;
-                line-height: 1.6;
-                margin-bottom: 20px;
+                margin-bottom: 12px;
             }}
             .badge {{
-                background-color: rgba(255, 75, 75, 0.15);
-                border: 1px solid rgba(255, 75, 75, 0.4);
-                color: #ff4b4b;
-                padding: 12px 16px;
-                border-radius: 8px;
-                font-size: 0.9rem;
-                font-weight: 600;
-                margin-bottom: 24px;
+                background-color: rgba(255, 75, 75, 0.2);
+                border: 1px solid rgba(255, 75, 75, 0.5);
+                color: #ff8080;
+                padding: 10px 14px;
+                border-radius: 6px;
+                font-size: 0.85rem;
+                font-weight: bold;
+                margin-bottom: 20px;
                 text-align: center;
             }}
+            .message {{
+                font-size: 0.9rem;
+                color: #cbd5e1;
+                line-height: 1.5;
+                margin-bottom: 16px;
+            }}
             .footer {{
-                margin-top: 32px;
-                padding-top: 20px;
-                border-top: 1px solid #1f2937;
-                font-size: 0.75rem;
+                margin-top: 25px;
+                padding-top: 15px;
+                border-top: 1px solid #334155;
+                font-size: 0.7rem;
                 color: #64748b;
                 text-align: center;
-                line-height: 1.4;
             }}
         </style>
     </head>
     <body>
-        <div class="email-wrapper">
-            <div class="email-content">
-                <div class="header">
-                    <table width="100%" cellpadding="0" cellspacing="0">
-                        <tr>
-                            <td width="60" style="vertical-align: middle;">{logo_img_tag}</td>
-                            <td style="vertical-align: middle;">
-                                <h2 class="title">Warisan Security SOC</h2>
-                                <p class="subtitle">Malware Operations & AI Threat Analytics</p>
-                            </td>
-                        </tr>
-                    </table>
-                </div>
-                <div class="greeting">Hello {username},</div>
-                <div class="badge">✓ Account Successfully Registered</div>
-                <div class="message">
-                    Your account for the Warisan Security Malware Operations SOC Portal has been successfully created and secured with 2FA privileges.
-                </div>
-                <div class="message">
-                    You can now log in using your credentials to access real-time AI threat detection dashboards, Deep LSTM analytics, and automated SOAR incident response tools.
-                </div>
-                <div class="footer">
-                    Warisan Security Operations Center (SOC) Automated Notification Service<br>
-                    This is a secure automated notification. Please do not reply directly to this email.
-                </div>
+        <div class="email-content">
+            <div class="header">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td width="55" style="vertical-align: middle;">{logo_img_tag}</td>
+                        <td style="vertical-align: middle;">
+                            <h2 class="title">Warisan Security SOC</h2>
+                            <p class="subtitle">Malware Operations & AI Threat Analytics</p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div class="greeting">Hello {username},</div>
+            <div class="badge">✓ Account Successfully Registered</div>
+            <div class="message">
+                Your account for the Warisan Security Malware Operations SOC Portal has been successfully created and secured with 2FA privileges.
+            </div>
+            <div class="message">
+                You can now log in using your credentials to access real-time AI threat detection dashboards, Deep LSTM analytics, and automated SOAR incident response tools.
+            </div>
+            <div class="footer">
+                Warisan Security Operations Center (SOC) Automated Notification Service<br>
+                This is a secure automated notification. Please do not reply directly to this email.
             </div>
         </div>
     </body>
@@ -459,7 +438,7 @@ if not st.session_state["logged_in"]:
                 username_input = st.text_input("Username or Email", key="login_username")
                 password = st.text_input("Password", type="password", key="login_password")
                 
-                # --- FORGOT PASSWORD CLICKABLE LINK (AT RED PEN POSITION) ---
+                # --- FORGOT PASSWORD CLICKABLE LINK ---
                 col_fp1, col_fp2 = st.columns([1, 1])
                 with col_fp1:
                     if st.button("Forgot Password?", key="forgot_pass_link", help="Click to reset your password"):
