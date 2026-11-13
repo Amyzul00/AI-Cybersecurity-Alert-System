@@ -33,6 +33,9 @@ from reportlab.platypus import (
 )
 import streamlit as st
 
+# Initialize Database Schema
+init_db()
+
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
     page_title="Warisan Security Malware Operations - AI Threat Detection",
@@ -40,6 +43,55 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# --- GLOBAL SESSION STATE INITIALIZATION ---
+if "user_email" not in st.session_state:
+    st.session_state["user_email"] = None
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+if "username" not in st.session_state:
+    st.session_state["username"] = ""
+if "role" not in st.session_state:
+    st.session_state["role"] = ""
+if "otp_required" not in st.session_state:
+    st.session_state["otp_required"] = False
+if "generated_otp" not in st.session_state:
+    st.session_state["generated_otp"] = ""
+if "temp_username" not in st.session_state:
+    st.session_state["temp_username"] = ""
+if "temp_role" not in st.session_state:
+    st.session_state["temp_role"] = ""
+if "temp_email" not in st.session_state:
+    st.session_state["temp_email"] = ""
+if "last_alerted_threat" not in st.session_state:
+    st.session_state.last_alerted_threat = None
+
+# Auth View Navigation State ("Login", "Register", "Forgot")
+if "auth_view" not in st.session_state:
+    st.session_state["auth_view"] = "Login"
+
+# Forgot Password Session States
+if "forgot_step" not in st.session_state:
+    st.session_state["forgot_step"] = 1
+if "forgot_email" not in st.session_state:
+    st.session_state["forgot_email"] = ""
+if "forgot_code" not in st.session_state:
+    st.session_state["forgot_code"] = ""
+
+if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
+    st.session_state.role = "admin"
+
+# --- HIDE TOP-RIGHT HEADER CONTROLS (MANAGE APP, GITHUB, ETC.) FOR NON-ADMINS ---
+user_role = st.session_state.get('role', 'user').strip().lower()
+if user_role != 'admin':
+    st.markdown("""
+        <style>
+        header[data-testid="stHeader"] {
+            visibility: hidden !important;
+            pointer-events: none !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
 # --- FONT AWESOME CDN FOR SIDEBAR ICONS ---
 st.markdown('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">', unsafe_allow_html=True)
@@ -54,17 +106,6 @@ st.markdown("""
     .stApp {
         background: radial-gradient(circle at 50% 30%, #121826 0%, #080a0f 70%);
         color: #e2e8f0;
-    }
-
-    /* Hide specific top-right header action buttons (Share, Star, Edit, GitHub) while keeping the 3-dot menu */
-    button[data-testid="baseButton-header"],
-    button[kind="header"],
-    .stAppToolbar button:not(:last-child) {
-        display: none !important;
-    }
-    
-    header[data-testid="stHeader"] {
-        background: transparent !important;
     }
 
     /* Modern SOC Auth Card Container */
@@ -102,40 +143,6 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
-
-# --- GLOBAL SESSION STATE INITIALIZATION ---
-if "user_email" not in st.session_state:
-    st.session_state["user_email"] = None
-if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
-if "username" not in st.session_state:
-    st.session_state["username"] = ""
-if "role" not in st.session_state:
-    st.session_state["role"] = ""
-if "otp_required" not in st.session_state:
-    st.session_state["otp_required"] = False
-if "generated_otp" not in st.session_state:
-    st.session_state["generated_otp"] = ""
-if "temp_username" not in st.session_state:
-    st.session_state["temp_username"] = ""
-if "temp_role" not in st.session_state:
-    st.session_state["temp_role"] = ""
-if "temp_email" not in st.session_state:
-    st.session_state["temp_email"] = ""
-if "last_alerted_threat" not in st.session_state:
-    st.session_state.last_alerted_threat = None
-
-# Auth View Navigation State ("Login", "Register", "Forgot")
-if "auth_view" not in st.session_state:
-    st.session_state["auth_view"] = "Login"
-
-# Forgot Password Session States
-if "forgot_step" not in st.session_state:
-    st.session_state["forgot_step"] = 1
-if "forgot_email" not in st.session_state:
-    st.session_state["forgot_email"] = ""
-if "forgot_code" not in st.session_state:
-    st.session_state["forgot_code"] = ""
 
 # ==========================================
 # HELPER: BASE64 IMAGE ENCODING
@@ -431,7 +438,6 @@ if not st.session_state["logged_in"]:
                     st.rerun()
 
         else:
-            # Only show Sign In and Register on top navigation tabs (Recovery is hidden until requested)
             nav_col1, nav_col2 = st.columns(2)
             with nav_col1:
                 if st.button("Sign In", use_container_width=True, type="primary" if st.session_state["auth_view"] == "Login" else "secondary"):
@@ -449,7 +455,6 @@ if not st.session_state["logged_in"]:
                 username_input = st.text_input("Username or Email", key="login_username")
                 password = st.text_input("Password", type="password", key="login_password")
                 
-                # --- FORGOT PASSWORD CLICKABLE LINK ---
                 col_fp1, col_fp2 = st.columns([1, 1])
                 with col_fp1:
                     if st.button("Forgot Password?", key="forgot_pass_link", help="Click to reset your password"):
@@ -506,7 +511,7 @@ if not st.session_state["logged_in"]:
                                 st.session_state["auth_view"] = "Login"
                                 st.rerun()
                             else:
-                                st.error("Registration failed. Username or email may already exist.")
+                                st.error("Registration failed. This email address or username is already registered to another account.")
                         else:
                             st.error("Passwords do not match. Please re-enter.")
                     else:
@@ -600,7 +605,7 @@ if not st.session_state["logged_in"]:
 if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
     st.session_state.role = "admin"
 
-# Clean header layout without top buttons
+# Clean header layout
 if logo_base64:
     st.markdown(f"""
         <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 20px;">
@@ -1090,7 +1095,7 @@ st.dataframe(
     },
 )
 
-# --- DEEP LSTM DIAGNOSTICS & LOGS (POSITIONED RIGHT BELOW THREAT EVENT LOG) ---
+# --- DEEP LSTM DIAGNOSTICS & LOGS (POSITIONED BELOW THREAT EVENT LOG) ---
 with st.expander("🔬 Show Deep LSTM Layer Diagnostics & Neural Network Logs"):
     st.code(
         """
