@@ -144,29 +144,47 @@ def handle_security_event(message, is_critical=True):
 # MODERN CARD-BASED AUTH VIEW (LOGIN / REGISTER / OTP)
 # ==========================================
 if not st.session_state["logged_in"]:
+    # Custom CSS to transform the middle column into a unified white card matching your reference image
     st.markdown("""
         <style>
         .stApp {
-            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 50%, #fce7f3 100%);
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 50%, #fbcfe8 100%);
             color: #1f2937;
         }
         header {visibility: hidden;}
+
+        /* Turn the middle column into a gorgeous white card container */
+        div[data-testid="column"]:nth-of-type(2) {
+            background: #ffffff;
+            padding: 40px 44px;
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            margin-top: 6vh;
+        }
+
+        /* Style form inputs inside the card to look sleek and modern */
+        div[data-testid="column"]:nth-of-type(2) input {
+            background-color: #f8fafc !important;
+            border: 1px solid #cbd5e1 !important;
+            color: #0f172a !important;
+            border-radius: 8px !important;
+        }
         </style>
     """, unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([1, 1.2, 1])
+    col1, col2, col3 = st.columns([1, 1.25, 1])
     with col2:
-        logo_html = f'<img src="{logo_base64}" style="width: 42px; height: 42px; border-radius: 50%; object-fit: cover; border: 1.5px solid #e5e7eb;" alt="Logo">' if logo_base64 else '<span style="font-size: 2rem;">🛡️</span>'
+        logo_html = f'<img src="{logo_base64}" style="width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 1.5px solid #e2e8f0;" alt="Logo">' if logo_base64 else '<span style="font-size: 2rem;">🛡️</span>'
 
         st.markdown(f"""
-            <div style="background: #ffffff; padding: 32px 36px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); border: 1px solid rgba(229, 231, 235, 0.8);">
-                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px;">
-                    {logo_html}
-                    <div>
-                        <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: #111827; letter-spacing: -0.3px;">Warisan Security</h3>
-                        <p style="margin: 0; font-size: 0.8rem; color: #6b7280;">Malware Operations & AI SOC.</p>
-                    </div>
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 22px;">
+                {logo_html}
+                <div>
+                    <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: #111827; letter-spacing: -0.3px;">Warisan Security</h3>
+                    <p style="margin: 0; font-size: 0.78rem; color: #6b7280;">Malware Operations & AI SOC.</p>
                 </div>
+            </div>
         """, unsafe_allow_html=True)
 
         if st.session_state["otp_required"]:
@@ -199,6 +217,7 @@ if not st.session_state["logged_in"]:
                     st.rerun()
 
         else:
+            # Pill Switcher Tabs (Log in / Create account)
             tab_c1, tab_c2 = st.columns(2)
             with tab_c1:
                 if st.button("Log in", use_container_width=True, type="primary" if st.session_state["auth_mode"] == "Login" else "secondary"):
@@ -209,7 +228,7 @@ if not st.session_state["logged_in"]:
                     st.session_state["auth_mode"] = "Register"
                     st.rerun()
 
-            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='margin-top: 12px;'></div>", unsafe_allow_html=True)
 
             if st.session_state["auth_mode"] == "Login":
                 st.markdown("<h4 style='margin-bottom: 12px; color: #111827; font-size: 1.25rem;'>Welcome back</h4>", unsafe_allow_html=True)
@@ -218,7 +237,7 @@ if not st.session_state["logged_in"]:
                 login_pass_input = st.text_input("Password", type="password", key="l_pass")
                 
                 st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-                if st.button("Log in", use_container_width=True):
+                if st.button("Log in", use_container_width=True, type="primary"):
                     if login_user_input and login_pass_input:
                         try:
                             conn = get_db_connection()
@@ -246,7 +265,7 @@ if not st.session_state["logged_in"]:
                         st.warning("Please enter credentials.")
 
                 st.markdown("""
-                    <div style="text-align: center; margin-top: 18px; font-size: 0.85rem; color: #6b7280;">
+                    <div style="text-align: center; margin-top: 20px; font-size: 0.8rem; color: #9ca3af;">
                         Secure SOC Portal — 2FA Enabled
                     </div>
                 """, unsafe_allow_html=True)
@@ -259,7 +278,7 @@ if not st.session_state["logged_in"]:
                 r_pass = st.text_input("Choose Password", type="password", key="r_pass")
                 
                 st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-                if st.button("Register Account", use_container_width=True):
+                if st.button("Register Account", use_container_width=True, type="primary"):
                     if r_user and r_email and r_pass:
                         success = register_user(r_user, r_email, r_pass, "user")
                         if success:
@@ -272,8 +291,6 @@ if not st.session_state["logged_in"]:
                 st.markdown("""
                     <p style="text-align: center; font-size: 0.75rem; color: #9ca3af; margin-top: 16px;">By registering, you will receive automated threat email notifications.</p>
                 """, unsafe_allow_html=True)
-
-        st.markdown("</div>", unsafe_allow_html=True)
 
     st.stop()
 
