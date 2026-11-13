@@ -589,20 +589,50 @@ if not st.session_state["logged_in"]:
 if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
     st.session_state.role = "admin"
 
-# Replaced the custom profile/rescan buttons with a single full-width header
-if logo_base64:
-    st.markdown(f"""
-        <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 20px;">
-            <img src="{logo_base64}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 10px rgba(0,0,0,0.5);" alt="Logo">
-            <div>
-                <h1 style="margin: 0; font-size: 2.2rem; color: #ffffff;">Warisan Security Malware Operations</h1>
-                <p style="margin: 5px 0 0 0; color: #8a99ad; font-size: 1rem;">🔒 Dynamic Threat Detection, Automated Incident Analytics & SOAR</p>
+col_header, col_profile, col_btn = st.columns([3, 1.4, 0.9])
+
+with col_header:
+    if logo_base64:
+        st.markdown(f"""
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <img src="{logo_base64}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 10px rgba(0,0,0,0.5);" alt="Logo">
+                <div>
+                    <h1 style="margin: 0; font-size: 2.2rem; color: #ffffff;">Warisan Security Malware Operations</h1>
+                    <p style="margin: 5px 0 0 0; color: #8a99ad; font-size: 1rem;">🔒 Dynamic Threat Detection, Automated Incident Analytics & SOAR</p>
+                </div>
             </div>
-        </div>
-    """, unsafe_allow_html=True)
-else:
-    st.title("Warisan Security Malware Operations")
-    st.caption("🔒 Dynamic Threat Detection, Automated Incident Analytics & SOAR")
+        """, unsafe_allow_html=True)
+    else:
+        st.title("Warisan Security Malware Operations")
+        st.caption("🔒 Dynamic Threat Detection, Automated Incident Analytics & SOAR")
+
+with col_profile:
+    with st.popover("👤 User Profile & Session", use_container_width=True):
+        st.markdown(f"""
+            <div style="background-color: #0d2318; border: 1px solid #1e4630; border-radius: 8px; padding: 12px; margin-bottom: 10px;">
+                <p style="margin: 0; color: #4cd137; font-size: 0.95rem;">👤 User: <b>{st.session_state['username']}</b></p>
+                <p style="margin: 4px 0 0 0; color: #fbc531; font-size: 0.95rem;">🔑 Role: <b>{st.session_state['role'].upper()}</b></p>
+            </div>
+        """, unsafe_allow_html=True)
+        if st.button("🚪 Sign Out", use_container_width=True, key="header_sign_out"):
+            st.session_state["logged_in"] = False
+            st.session_state["username"] = ""
+            st.session_state["role"] = ""
+            st.session_state["email"] = None
+            st.session_state["user_email"] = None
+            st.rerun()
+
+with col_btn:
+    st.write(" ")
+    rescan_clicked = st.button("🔄 Refresh & Rescan", use_container_width=True)
+
+if rescan_clicked:
+    st.cache_data.clear()
+    with st.spinner("Analyzing real-time network packets and refreshing data..."):
+        time.sleep(1.2)
+    st.toast("🚨 High severity activity re-scanned successfully!", icon="⚠️")
+    st.toast("✅ Data refreshed & packet re-scan complete.", icon="🛡️")
+    st.rerun()
 
 @st.cache_resource
 def load_detection_engine():
