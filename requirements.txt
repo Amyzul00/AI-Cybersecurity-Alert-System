@@ -1,10 +1,6 @@
 streamlit
-plotly
 pandas
-numpy
-torch
-scapy
-mysql-connector-python
+plotly
+pillow
 reportlab
-joblib
-plyer
+pymysql
