@@ -462,9 +462,11 @@ if not st.session_state["logged_in"]:
                             st.session_state["forgot_step"] = 1
                             st.rerun()
 
-        st.markdown("""
+        footer_logo_html = f'<img src="{logo_base64}" style="width: 16px; height: 16px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 6px;" alt="Logo">' if logo_base64 else '🛡️'
+
+        st.markdown(f"""
             <div style="text-align: center; margin-top: 24px; font-size: 0.78rem; color: #64748b;">
-                🛡️ Warisan Security Operations Center — Secure 2FA Environment
+                {footer_logo_html} Warisan Security Operations Center — Secure 2FA Environment
             </div>
         """, unsafe_allow_html=True)
 
