@@ -197,31 +197,140 @@ def send_security_alert_to_all(src_ip, threat_type):
     return auto_send_lstm_threat_alert(threat_type)
 
 def send_welcome_email(recipient_email, username):
-    """Sends a welcome notification email when a new account is registered."""
+    """Sends a beautifully styled HTML welcome notification email matching the SOC dark/red theme."""
     SENDER_EMAIL = "warisansecurityalerts@gmail.com"
     SENDER_PASSWORD = "zjmm vunm ngec wkvu"
     
     subject = "🛡️ [WARISAN SOC] Account Successfully Registered"
-    body = f"""
-    Hello {username},
+    
+    logo_b64 = get_base64_image("Logo.png")
+    logo_img_tag = f'<img src="{logo_b64}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b;" alt="Logo">' if logo_b64 else '<span style="font-size: 2rem;">🛡️</span>'
 
-    Your account for the Warisan Security Malware Operations SOC Portal has been successfully created!
-
-    You can now log in using your credentials to access the AI threat detection dashboard, Deep LSTM analytics, and SOAR incident response tools.
-
-    --
-    Warisan Security Operations Center (SOC) Automated Notification Service
+    html_body = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            body {{
+                background-color: #080a0f;
+                color: #e2e8f0;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                margin: 0;
+                padding: 40px 0;
+            }}
+            .email-wrapper {{
+                width: 100%;
+                table-layout: fixed;
+                background-color: #080a0f;
+                padding-bottom: 40px;
+            }}
+            .email-content {{
+                max-width: 600px;
+                margin: 0 auto;
+                background: linear-gradient(145deg, #121824 0%, #0b0f17 100%);
+                border-radius: 16px;
+                border: 1px solid rgba(255, 75, 75, 0.3);
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+                padding: 40px;
+            }}
+            .header {{
+                border-bottom: 1px solid #1f2937;
+                padding-bottom: 20px;
+                margin-bottom: 24px;
+            }}
+            .title {{
+                font-size: 1.25rem;
+                font-weight: 700;
+                color: #ffffff;
+                margin: 0;
+            }}
+            .subtitle {{
+                font-size: 0.8rem;
+                color: #94a3b8;
+                margin: 4px 0 0 0;
+            }}
+            .greeting {{
+                font-size: 1.1rem;
+                font-weight: 600;
+                color: #f8fafc;
+                margin-bottom: 16px;
+            }}
+            .message {{
+                font-size: 0.95rem;
+                color: #cbd5e1;
+                line-height: 1.6;
+                margin-bottom: 20px;
+            }}
+            .badge {{
+                background-color: rgba(255, 75, 75, 0.15);
+                border: 1px solid rgba(255, 75, 75, 0.4);
+                color: #ff4b4b;
+                padding: 12px 16px;
+                border-radius: 8px;
+                font-size: 0.9rem;
+                font-weight: 600;
+                margin-bottom: 24px;
+                text-align: center;
+            }}
+            .footer {{
+                margin-top: 32px;
+                padding-top: 20px;
+                border-top: 1px solid #1f2937;
+                font-size: 0.75rem;
+                color: #64748b;
+                text-align: center;
+                line-height: 1.4;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="email-wrapper">
+            <div class="email-content">
+                <div class="header">
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                            <td width="60" style="vertical-align: middle;">{logo_img_tag}</td>
+                            <td style="vertical-align: middle;">
+                                <h2 class="title">Warisan Security SOC</h2>
+                                <p class="subtitle">Malware Operations & AI Threat Analytics</p>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div class="greeting">Hello {username},</div>
+                
+                <div class="badge">✓ Account Successfully Registered</div>
+                
+                <div class="message">
+                    Your account for the Warisan Security Malware Operations SOC Portal has been successfully created and secured with 2FA privileges.
+                </div>
+                
+                <div class="message">
+                    You can now log in using your credentials to access real-time AI threat detection dashboards, Deep LSTM analytics, and automated SOAR incident response tools.
+                </div>
+                
+                <div class="footer">
+                    Warisan Security Operations Center (SOC) Automated Notification Service<br>
+                    This is a secure automated notification. Please do not reply directly to this email.
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
     """
+
     try:
         server = smtplib.SMTP("smtp.gmail.com", 587)
         server.starttls()
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
         
-        msg = MIMEMultipart()
+        msg = MIMEMultipart("alternative")
         msg["From"] = SENDER_EMAIL
         msg["To"] = recipient_email
         msg["Subject"] = subject
-        msg.attach(MIMEText(body, "plain"))
+        msg.attach(MIMEText(html_body, "html"))
         
         server.sendmail(SENDER_EMAIL, recipient_email, msg.as_string())
         server.quit()
@@ -378,7 +487,7 @@ if not st.session_state["logged_in"]:
                         if reg_pass == reg_confirm_pass:
                             success = register_user(reg_user, reg_email, reg_pass, "user")
                             if success:
-                                with st.spinner("Sending confirmation email..."):
+                                with st.spinner("Sending styled confirmation email..."):
                                     send_welcome_email(reg_email, reg_user)
                                 
                                 st.success("Account successfully registered & confirmation email sent! Redirecting to Sign In...")
