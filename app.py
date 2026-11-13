@@ -856,7 +856,7 @@ with st.sidebar.expander("🛡️ Incident Response (SOAR)", expanded=False):
         handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated (User: {st.session_state['username']}).", is_critical=True)
         st.success(f"Successfully isolated host {target_ip}!")
 
-# --- ADMIN CONTROLS IN SIDEBAR WITH DOWNLOAD BUTTONS ---
+# --- ADMIN CONTROLS IN SIDEBAR (RESTRICTED TO ADMIN) ---
 user_role = st.session_state.get('role', 'user').strip().lower()
 if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
     user_role = "admin"
