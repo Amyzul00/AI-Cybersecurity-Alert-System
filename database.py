@@ -1,24 +1,14 @@
-import pymysql
+import sqlite3
 import datetime
 import os
 
-# Database configuration parameters for MySQL
-DB_HOST = 'localhost'
-DB_USER = 'root'
-DB_PASSWORD = ''
-DB_NAME = 'cybersecurity_db'
+DB_NAME = 'threat_logs.db'
 
 
 def get_db_connection():
-    """Create a connection to the MySQL cybersecurity database."""
-    conn = pymysql.connect(
-        host=DB_HOST,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME,
-        charset='utf8mb4',
-        cursorclass=pymysql.cursors.DictCursor
-    )
+    """Create a connection to the SQLite cybersecurity database."""
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row  # Enables dictionary-like access to rows
     return conn
 
 
@@ -27,34 +17,36 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        # Create threat_logs table if it doesn't exist
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS threat_logs (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                timestamp VARCHAR(50) NOT NULL,
-                src_ip VARCHAR(50) NOT NULL,
-                dst_ip VARCHAR(50) NOT NULL,
-                protocol VARCHAR(20) NOT NULL,
-                threat_type VARCHAR(50) NOT NULL,
-                severity VARCHAR(20) NOT NULL,
-                confidence_score FLOAT NOT NULL,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                src_ip TEXT NOT NULL,
+                dst_ip TEXT NOT NULL,
+                protocol TEXT NOT NULL,
+                threat_type TEXT NOT NULL,
+                severity TEXT NOT NULL,
+                confidence_score REAL NOT NULL,
                 raw_features TEXT
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            )
         ''')
 
+        # Create users table if it doesn't exist
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                username VARCHAR(100) NOT NULL UNIQUE,
-                email VARCHAR(150) NOT NULL UNIQUE,
-                role VARCHAR(50) NOT NULL DEFAULT 'user',
-                password VARCHAR(255) NOT NULL DEFAULT '',
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                email TEXT NOT NULL UNIQUE,
+                role TEXT NOT NULL DEFAULT 'user',
+                password TEXT NOT NULL DEFAULT '',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            )
         ''')
         conn.commit()
-        print(f"[+] MySQL Database initialized successfully: {DB_NAME}")
+        print(f"[+] SQLite Database initialized successfully: {DB_NAME}")
     except Exception as e:
-        print(f"[-] MySQL Database initialization error: {e}")
+        print(f"[-] SQLite Database initialization error: {e}")
     finally:
         cursor.close()
         conn.close()
@@ -64,7 +56,7 @@ def log_threat(
     src_ip, dst_ip, protocol, threat_type,
     severity, confidence_score, raw_features=""
 ):
-    """Record a detected threat in the MySQL database."""
+    """Record a detected threat in the SQLite database."""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -74,7 +66,7 @@ def log_threat(
                 timestamp, src_ip, dst_ip, protocol,
                 threat_type, severity, confidence_score, raw_features
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             timestamp, src_ip, dst_ip, protocol,
             threat_type, severity, float(confidence_score),
@@ -82,7 +74,7 @@ def log_threat(
         ))
         conn.commit()
     except Exception as e:
-        print(f"[-] MySQL Database insertion error: {e}")
+        print(f"[-] SQLite Database insertion error: {e}")
     finally:
         cursor.close()
         conn.close()
@@ -94,11 +86,12 @@ def fetch_recent_threats(limit=50):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "SELECT * FROM threat_logs ORDER BY id DESC LIMIT %s",
+            "SELECT * FROM threat_logs ORDER BY id DESC LIMIT ?",
             (int(limit),)
         )
         rows = cursor.fetchall()
-        return rows
+        # Convert sqlite3.Row objects to dictionaries to match pymysql behavior
+        return [dict(row) for row in rows]
     finally:
         cursor.close()
         conn.close()
@@ -110,12 +103,12 @@ def register_user(username: str, email: str, password: str, role: str = "user") 
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO users (username, email, role, password) VALUES (%s, %s, %s, %s)",
+            "INSERT INTO users (username, email, role, password) VALUES (?, ?, ?, ?)",
             (username.strip(), email.strip().lower(), role, password)
         )
         conn.commit()
         return True
-    except pymysql.err.IntegrityError:
+    except sqlite3.IntegrityError:
         return False
     finally:
         cursor.close()
