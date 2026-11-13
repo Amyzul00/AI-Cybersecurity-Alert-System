@@ -376,6 +376,22 @@ def handle_security_event(message, is_critical=True):
     print(f"[SOAR] {message}")
 
 # ==========================================
+# PERSISTENT SIDEBAR INITIALIZATION (Ensures sidebar stays expanded)
+# ==========================================
+st.sidebar.markdown(
+    """
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 5px 15px 5px; border-bottom: 1px solid #1f2937; margin-bottom: 15px;">
+        <span style="font-size: 1.1rem; font-weight: bold; color: #ffffff;">Navigation</span>
+        <i class="fa-solid fa-ellipsis-vertical" style="color: #94a3b8; font-size: 1.2rem;" title="Options"></i>
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
+
+if logo_base64:
+    st.sidebar.markdown(f'<div style="text-align: center; margin-bottom: 12px;"><img src="{logo_base64}" style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 0 12px rgba(255,75,75,0.6);"></div>', unsafe_allow_html=True)
+
+# ==========================================
 # VIEW 1: MODERN SOC CARD AUTHENTICATION
 # ==========================================
 if not st.session_state["logged_in"]:
@@ -797,35 +813,25 @@ def generate_pdf_report(dataframe):
     return buffer
 
 # ==========================================
-# SIDEBAR (ORGANIZED & EXPANDABLE SECTIONS)
+# SIDEBAR EXPANDERS & CONTROLS
 # ==========================================
-st.sidebar.markdown(
-    """
-    <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 5px 15px 5px; border-bottom: 1px solid #1f2937; margin-bottom: 15px;">
-        <span style="font-size: 1.1rem; font-weight: bold; color: #ffffff;">Navigation</span>
-        <i class="fa-solid fa-ellipsis-vertical" style="color: #94a3b8; font-size: 1.2rem;" title="Options"></i>
-    </div>
-    """, 
-    unsafe_allow_html=True
-)
-
-if logo_base64:
-    st.sidebar.markdown(f'<div style="text-align: center; margin-bottom: 12px;"><img src="{logo_base64}" style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 0 12px rgba(255,75,75,0.6);"></div>', unsafe_allow_html=True)
-
 with st.sidebar.expander("👤 User Profile & Session", expanded=True):
-    st.markdown(f"""
-        <div style="background-color: #0d2318; border: 1px solid #1e4630; border-radius: 8px; padding: 12px; margin-bottom: 10px;">
-            <p style="margin: 0; color: #4cd137; font-size: 0.95rem;">👤 User: <b>{st.session_state['username']}</b></p>
-            <p style="margin: 4px 0 0 0; color: #fbc531; font-size: 0.95rem;">🔑 Role: <b>{st.session_state['role'].upper()}</b></p>
-        </div>
-    """, unsafe_allow_html=True)
-    if st.button("🚪 Sign Out", use_container_width=True):
-        st.session_state["logged_in"] = False
-        st.session_state["username"] = ""
-        st.session_state["role"] = ""
-        st.session_state["email"] = None
-        st.session_state["user_email"] = None
-        st.rerun()
+    if st.session_state['logged_in']:
+        st.markdown(f"""
+            <div style="background-color: #0d2318; border: 1px solid #1e4630; border-radius: 8px; padding: 12px; margin-bottom: 10px;">
+                <p style="margin: 0; color: #4cd137; font-size: 0.95rem;">👤 User: <b>{st.session_state['username']}</b></p>
+                <p style="margin: 4px 0 0 0; color: #fbc531; font-size: 0.95rem;">🔑 Role: <b>{st.session_state['role'].upper()}</b></p>
+            </div>
+        """, unsafe_allow_html=True)
+        if st.button("🚪 Sign Out", use_container_width=True):
+            st.session_state["logged_in"] = False
+            st.session_state["username"] = ""
+            st.session_state["role"] = ""
+            st.session_state["email"] = None
+            st.session_state["user_email"] = None
+            st.rerun()
+    else:
+        st.info("🔒 Please sign in to view session details.")
 
 with st.sidebar.expander("🚨 Alert & Notification Center", expanded=False):
     recent_threats = fetch_recent_threats(limit=10)
@@ -1139,7 +1145,7 @@ with col_download:
             use_container_width=True,
         )
 
-        pdf_buffer = generate_pdf_report(filtered_df)
+        pdf_buffer = executive_threat_report_pdf = generate_pdf_report(filtered_df)
         st.download_button(
             label="📄 Download PDF Report",
             data=pdf_buffer,
