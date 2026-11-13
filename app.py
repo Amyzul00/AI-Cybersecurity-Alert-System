@@ -931,22 +931,6 @@ if user_role == 'admin':
 else:
     st.sidebar.caption("🔒 *Admin controls & report downloads are restricted to Administrator accounts.*")
 
-# --- MOVED DEEP LSTM DIAGNOSTICS LOGS TO SIDEBAR ---
-st.sidebar.markdown("---")
-with st.sidebar.expander("🔬 Deep LSTM Diagnostics & Logs"):
-    st.code(
-        """
-[INFO] LSTM Input Shape: (Batch_Size=25, Time_Steps=100, Features=42)
-[INFO] Layer 1 (CuDNNLSTM): Output Shape=(None, 128), Parameters=87,552
-[INFO] Dropout (0.2): Applied
-[INFO] Layer 2 (Dense Softmax): Classifying into [Normal, Bot, DDoS, PortScan]
-[XAI] Gradient Saliency Computed: Input gradients backpropagated successfully.
-[SOAR] Firewall Controller Status: Active (Ready to push blocking rules)
-[DEBUG] Loss: 0.1421 | Val_Loss: 0.1804 | Inference Latency: 12.4ms/sample
-""",
-        language="bash",
-    )
-
 # --- METRICS ROW ---
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("Processed Datasets", "25", delta="Completed")
@@ -1105,6 +1089,21 @@ st.dataframe(
         "Acc": st.column_config.NumberColumn("Row Accuracy (%)", format="%.1f%%"),
     },
 )
+
+# --- DEEP LSTM DIAGNOSTICS & LOGS (POSITIONED RIGHT BELOW THREAT EVENT LOG) ---
+with st.expander("🔬 Show Deep LSTM Layer Diagnostics & Neural Network Logs"):
+    st.code(
+        """
+[INFO] LSTM Input Shape: (Batch_Size=25, Time_Steps=100, Features=42)
+[INFO] Layer 1 (CuDNNLSTM): Output Shape=(None, 128), Parameters=87,552
+[INFO] Dropout (0.2): Applied
+[INFO] Layer 2 (Dense Softmax): Classifying into [Normal, Bot, DDoS, PortScan]
+[XAI] Gradient Saliency Computed: Input gradients backpropagated successfully.
+[SOAR] Firewall Controller Status: Active (Ready to push blocking rules)
+[DEBUG] Loss: 0.1421 | Val_Loss: 0.1804 | Inference Latency: 12.4ms/sample
+""",
+        language="bash",
+    )
 
 st.divider()
 
