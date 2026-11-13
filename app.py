@@ -593,7 +593,7 @@ if not st.session_state["logged_in"]:
 if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
     st.session_state.role = "admin"
 
-col_header, col_btn = st.columns([4, 1])
+col_header, col_profile, col_btn = st.columns([3, 1.4, 0.9])
 
 with col_header:
     if logo_base64:
@@ -610,9 +610,25 @@ with col_header:
         st.title("Warisan Security Malware Operations")
         st.caption("🔒 Dynamic Threat Detection, Automated Incident Analytics & SOAR")
 
+with col_profile:
+    with st.popover("👤 User Profile & Session", use_container_width=True):
+        st.markdown(f"""
+            <div style="background-color: #0d2318; border: 1px solid #1e4630; border-radius: 8px; padding: 12px; margin-bottom: 10px;">
+                <p style="margin: 0; color: #4cd137; font-size: 0.95rem;">👤 User: <b>{st.session_state['username']}</b></p>
+                <p style="margin: 4px 0 0 0; color: #fbc531; font-size: 0.95rem;">🔑 Role: <b>{st.session_state['role'].upper()}</b></p>
+            </div>
+        """, unsafe_allow_html=True)
+        if st.button("🚪 Sign Out", use_container_width=True, key="header_sign_out"):
+            st.session_state["logged_in"] = False
+            st.session_state["username"] = ""
+            st.session_state["role"] = ""
+            st.session_state["email"] = None
+            st.session_state["user_email"] = None
+            st.rerun()
+
 with col_btn:
     st.write(" ")
-    rescan_clicked = st.button("🔄 Refresh & Rescan")
+    rescan_clicked = st.button("🔄 Refresh & Rescan", use_container_width=True)
 
 if rescan_clicked:
     st.cache_data.clear()
@@ -800,21 +816,6 @@ def generate_pdf_report(dataframe):
 # ==========================================
 if logo_base64:
     st.sidebar.markdown(f'<div style="text-align: center; margin-bottom: 12px;"><img src="{logo_base64}" style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 0 12px rgba(255,75,75,0.6);"></div>', unsafe_allow_html=True)
-
-with st.sidebar.expander("👤 User Profile & Session", expanded=True):
-    st.markdown(f"""
-        <div style="background-color: #0d2318; border: 1px solid #1e4630; border-radius: 8px; padding: 12px; margin-bottom: 10px;">
-            <p style="margin: 0; color: #4cd137; font-size: 0.95rem;">👤 User: <b>{st.session_state['username']}</b></p>
-            <p style="margin: 4px 0 0 0; color: #fbc531; font-size: 0.95rem;">🔑 Role: <b>{st.session_state['role'].upper()}</b></p>
-        </div>
-    """, unsafe_allow_html=True)
-    if st.button("🚪 Sign Out", use_container_width=True):
-        st.session_state["logged_in"] = False
-        st.session_state["username"] = ""
-        st.session_state["role"] = ""
-        st.session_state["email"] = None
-        st.session_state["user_email"] = None
-        st.rerun()
 
 with st.sidebar.expander("🚨 Alert & Notification Center", expanded=False):
     critical_alerts = df[df["Status"] == "CRITICAL"] if 'df' in locals() and not df.empty else pd.DataFrame()
