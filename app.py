@@ -375,22 +375,6 @@ def handle_security_event(message, is_critical=True):
     print(f"[SOAR] {message}")
 
 # ==========================================
-# PERSISTENT SIDEBAR INITIALIZATION
-# ==========================================
-st.sidebar.markdown(
-    """
-    <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 5px 15px 5px; border-bottom: 1px solid #1f2937; margin-bottom: 15px;">
-        <span style="font-size: 1.1rem; font-weight: bold; color: #ffffff;">Navigation</span>
-        <i class="fa-solid fa-ellipsis-vertical" style="color: #94a3b8; font-size: 1.2rem;" title="Options"></i>
-    </div>
-    """, 
-    unsafe_allow_html=True
-)
-
-if logo_base64:
-    st.sidebar.markdown(f'<div style="text-align: center; margin-bottom: 12px;"><img src="{logo_base64}" style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 0 12px rgba(255,75,75,0.6);"></div>', unsafe_allow_html=True)
-
-# ==========================================
 # VIEW 1: MODERN SOC CARD AUTHENTICATION
 # ==========================================
 if not st.session_state["logged_in"]:
@@ -604,46 +588,10 @@ if not st.session_state["logged_in"]:
 
 
 # ==========================================
-# VIEW 2: MAIN DASHBOARD
+# VIEW 2: MAIN DASHBOARD & SIDEBAR NAVIGATION
 # ==========================================
 if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
     st.session_state.role = "admin"
-
-col_header, col_btn = st.columns([4, 1])
-
-with col_header:
-    if logo_base64:
-        st.markdown(f"""
-            <div style="display: flex; align-items: center; gap: 20px;">
-                <img src="{logo_base64}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 10px rgba(0,0,0,0.5);" alt="Logo">
-                <div>
-                    <h1 style="margin: 0; font-size: 2.2rem; color: #ffffff;">Warisan Security Malware Operations</h1>
-                    <p style="margin: 5px 0 0 0; color: #8a99ad; font-size: 1rem;">🔒 Dynamic Threat Detection, Automated Incident Analytics & SOAR</p>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-    else:
-        st.title("Warisan Security Malware Operations")
-        st.caption("🔒 Dynamic Threat Detection, Automated Incident Analytics & SOAR")
-
-with col_btn:
-    st.write(" ")
-    rescan_clicked = st.button("🔄 Refresh & Rescan")
-
-if rescan_clicked:
-    st.cache_data.clear()
-    with st.spinner("Analyzing real-time network packets and refreshing data..."):
-        time.sleep(1.2)
-    st.toast("🚨 High severity activity re-scanned successfully!", icon="⚠️")
-    st.toast("✅ Data refreshed & packet re-scan complete.", icon="🛡️")
-    st.rerun()
-
-@st.cache_resource
-def load_detection_engine():
-    return True
-
-if load_detection_engine():
-    st.success("✅ Successfully connected to backend threat engine, Deep LSTM model, and SOAR framework.")
 
 @st.cache_data
 def get_backend_predictions():
@@ -693,9 +641,170 @@ def get_xai_feature_importances():
 
 xai_df = get_xai_feature_importances()
 
-# ==========================================
-# ENTERPRISE PDF REPORT GENERATION UTILITY
-# ==========================================
+# --- SIDEBAR (ONLY RENDERS ON DASHBOARD) ---
+st.sidebar.markdown(
+    """
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 5px 15px 5px; border-bottom: 1px solid #1f2937; margin-bottom: 15px;">
+        <span style="font-size: 1.1rem; font-weight: bold; color: #ffffff;">Navigation</span>
+        <i class="fa-solid fa-ellipsis-vertical" style="color: #94a3b8; font-size: 1.2rem;" title="Options"></i>
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
+
+if logo_base64:
+    st.sidebar.markdown(f'<div style="text-align: center; margin-bottom: 12px;"><img src="{logo_base64}" style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 0 12px rgba(255,75,75,0.6);"></div>', unsafe_allow_html=True)
+
+with st.sidebar.expander("👤 User Profile & Session", expanded=True):
+    st.markdown(f"""
+        <div style="background-color: #0d2318; border: 1px solid #1e4630; border-radius: 8px; padding: 12px; margin-bottom: 10px;">
+            <p style="margin: 0; color: #4cd137; font-size: 0.95rem;">👤 User: <b>{st.session_state['username']}</b></p>
+            <p style="margin: 4px 0 0 0; color: #fbc531; font-size: 0.95rem;">🔑 Role: <b>{st.session_state['role'].upper()}</b></p>
+        </div>
+    """, unsafe_allow_html=True)
+    if st.button("🚪 Sign Out", use_container_width=True):
+        st.session_state["logged_in"] = False
+        st.session_state["username"] = ""
+        st.session_state["role"] = ""
+        st.session_state["email"] = None
+        st.session_state["user_email"] = None
+        st.rerun()
+
+with st.sidebar.expander("🚨 Alert & Notification Center", expanded=False):
+    recent_threats = fetch_recent_threats(limit=10)
+    if recent_threats:
+        for threat in recent_threats:
+            threat_id = threat["id"]
+            src_ip = threat["src_ip"]
+            threat_type = threat["threat_type"]
+            severity = threat["severity"]
+            
+            if severity.lower() in ["high", "critical"]:
+                alert_flag_key = f"email_sent_threat_{threat_id}"
+                if not st.session_state.get(alert_flag_key, False):
+                    send_security_alert_to_all(src_ip, threat_type)
+                    st.session_state[alert_flag_key] = True
+                    st.success(f"Alert broadcasted for ID #{threat_id}!")
+    else:
+        st.caption("No recent threat alerts logged.")
+
+with st.sidebar.expander("🎛️ Filter & Analysis Controls", expanded=True):
+    selected_threats = st.multiselect(
+        "Select Threat Categories:",
+        options=df["Threat"].unique() if not df.empty else [],
+        default=list(df["Threat"].unique()) if not df.empty else [],
+    )
+    filtered_df = df[df["Threat"].isin(selected_threats)] if not df.empty else df
+
+with st.sidebar.expander("📡 Live Stream Telemetry", expanded=False):
+    stream_live = st.toggle("Enable Live Packet Feed", value=False)
+    if stream_live:
+        st.info("📡 Listening to active socket interface...")
+        time.sleep(1.5)
+        st.rerun()
+
+with st.sidebar.expander("🛡️ Incident Response (SOAR)", expanded=False):
+    target_ip = st.selectbox(
+        "Select Host IP to Isolate:",
+        options=filtered_df["IP"].unique() if not filtered_df.empty else ["N/A"],
+    )
+    if st.button("🚨 Block IP & Push Firewall Rule", type="primary") and target_ip != "N/A":
+        with st.spinner(f"Pushing rule to iptables for {target_ip}..."):
+            time.sleep(1.0)
+        handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated (User: {st.session_state['username']}).", is_critical=True)
+        st.success(f"Successfully isolated host {target_ip}!")
+
+user_role = st.session_state.get('role', 'user').strip().lower()
+if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
+    user_role = "admin"
+
+if user_role == 'admin':
+    st.sidebar.markdown("---")
+    st.sidebar.markdown('### <i class="fa-solid fa-bars" style="color: #ff4b4b; margin-right: 8px;"></i> Admin Controls', unsafe_allow_html=True)
+
+    if st.sidebar.button("📧 Email PDF Report to All Users", use_container_width=True):
+        try:
+            recipient_emails = get_all_registered_users()
+            
+            if not recipient_emails:
+                st.warning("No registered user emails found in the database.")
+            else:
+                sender_email = "warisansecurityalerts@gmail.com"
+                app_password = "zjmm vunm ngec wkvu"
+                success_count = 0
+                pdf_filename = "executive_threat_report.pdf"
+                
+                for recipient in recipient_emails:
+                    try:
+                        msg = MIMEMultipart()
+                        msg['From'] = sender_email
+                        msg['To'] = recipient
+                        msg['Subject'] = "[WARISAN SOC] Executive AI Threat & Malware Operations Report"
+                        
+                        body = "Attached is the latest automated executive threat intelligence report generated by Warisan Security Malware Operations."
+                        msg.attach(MIMEText(body, 'plain'))
+                        
+                        with open(pdf_filename, "rb") as f:
+                            attach = MIMEApplication(f.read(), Name=pdf_filename)
+                            attach['Content-Disposition'] = f'attachment; filename="{pdf_filename}"'
+                            msg.attach(attach)
+                        
+                        server = smtplib.SMTP('smtp.gmail.com', 587)
+                        server.starttls()
+                        server.login(sender_email, app_password)
+                        server.sendmail(sender_email, recipient, msg.as_string())
+                        server.quit()
+                        
+                        success_count += 1
+                    except Exception as inner_e:
+                        print(f"[-] Failed to send email to {recipient}: {inner_e}")
+                
+                st.success(f"Successfully broadcasted report to {success_count} out of {len(recipient_emails)} registered user(s)!")
+                
+        except Exception as e:
+            st.error(f"Broadcast failed: {e}")
+else:
+    st.sidebar.caption("🔒 *Multi-user PDF broadcast is restricted to Administrator accounts.*")
+
+
+# --- DASHBOARD HEADER & CONTENT ---
+col_header, col_btn = st.columns([4, 1])
+
+with col_header:
+    if logo_base64:
+        st.markdown(f"""
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <img src="{logo_base64}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 10px rgba(0,0,0,0.5);" alt="Logo">
+                <div>
+                    <h1 style="margin: 0; font-size: 2.2rem; color: #ffffff;">Warisan Security Malware Operations</h1>
+                    <p style="margin: 5px 0 0 0; color: #8a99ad; font-size: 1rem;">🔒 Dynamic Threat Detection, Automated Incident Analytics & SOAR</p>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.title("Warisan Security Malware Operations")
+        st.caption("🔒 Dynamic Threat Detection, Automated Incident Analytics & SOAR")
+
+with col_btn:
+    st.write(" ")
+    rescan_clicked = st.button("🔄 Refresh & Rescan")
+
+if rescan_clicked:
+    st.cache_data.clear()
+    with st.spinner("Analyzing real-time network packets and refreshing data..."):
+        time.sleep(1.2)
+    st.toast("🚨 High severity activity re-scanned successfully!", icon="⚠️")
+    st.toast("✅ Data refreshed & packet re-scan complete.", icon="🛡️")
+    st.rerun()
+
+@st.cache_resource
+def load_detection_engine():
+    return True
+
+if load_detection_engine():
+    st.success("✅ Successfully connected to backend threat engine, Deep LSTM model, and SOAR framework.")
+
+# --- ENTERPRISE PDF REPORT GENERATION UTILITY ---
 def generate_pdf_report(dataframe):
     buffer = BytesIO()
     doc = SimpleDocTemplate(
@@ -810,124 +919,6 @@ def generate_pdf_report(dataframe):
     buffer.seek(0)
     
     return buffer
-
-# ==========================================
-# SIDEBAR EXPANDERS & CONTROLS
-# ==========================================
-with st.sidebar.expander("👤 User Profile & Session", expanded=True):
-    if st.session_state['logged_in']:
-        st.markdown(f"""
-            <div style="background-color: #0d2318; border: 1px solid #1e4630; border-radius: 8px; padding: 12px; margin-bottom: 10px;">
-                <p style="margin: 0; color: #4cd137; font-size: 0.95rem;">👤 User: <b>{st.session_state['username']}</b></p>
-                <p style="margin: 4px 0 0 0; color: #fbc531; font-size: 0.95rem;">🔑 Role: <b>{st.session_state['role'].upper()}</b></p>
-            </div>
-        """, unsafe_allow_html=True)
-        if st.button("🚪 Sign Out", use_container_width=True):
-            st.session_state["logged_in"] = False
-            st.session_state["username"] = ""
-            st.session_state["role"] = ""
-            st.session_state["email"] = None
-            st.session_state["user_email"] = None
-            st.rerun()
-    else:
-        st.info("🔒 Please sign in to view session details.")
-
-with st.sidebar.expander("🚨 Alert & Notification Center", expanded=False):
-    recent_threats = fetch_recent_threats(limit=10)
-    if recent_threats:
-        for threat in recent_threats:
-            threat_id = threat["id"]
-            src_ip = threat["src_ip"]
-            threat_type = threat["threat_type"]
-            severity = threat["severity"]
-            
-            if severity.lower() in ["high", "critical"]:
-                alert_flag_key = f"email_sent_threat_{threat_id}"
-                if not st.session_state.get(alert_flag_key, False):
-                    send_security_alert_to_all(src_ip, threat_type)
-                    st.session_state[alert_flag_key] = True
-                    st.success(f"Alert broadcasted for ID #{threat_id}!")
-    else:
-        st.caption("No recent threat alerts logged.")
-
-with st.sidebar.expander("🎛️ Filter & Analysis Controls", expanded=True):
-    selected_threats = st.multiselect(
-        "Select Threat Categories:",
-        options=df["Threat"].unique() if not df.empty else [],
-        default=list(df["Threat"].unique()) if not df.empty else [],
-    )
-    filtered_df = df[df["Threat"].isin(selected_threats)] if not df.empty else df
-
-with st.sidebar.expander("📡 Live Stream Telemetry", expanded=False):
-    stream_live = st.toggle("Enable Live Packet Feed", value=False)
-    if stream_live:
-        st.info("📡 Listening to active socket interface...")
-        time.sleep(1.5)
-        st.rerun()
-
-with st.sidebar.expander("🛡️ Incident Response (SOAR)", expanded=False):
-    target_ip = st.selectbox(
-        "Select Host IP to Isolate:",
-        options=filtered_df["IP"].unique() if not filtered_df.empty else ["N/A"],
-    )
-    if st.button("🚨 Block IP & Push Firewall Rule", type="primary") and target_ip != "N/A":
-        with st.spinner(f"Pushing rule to iptables for {target_ip}..."):
-            time.sleep(1.0)
-        handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated (User: {st.session_state['username']}).", is_critical=True)
-        st.success(f"Successfully isolated host {target_ip}!")
-
-# --- ADMIN CONTROLS IN SIDEBAR WITH FONT AWESOME ICON ---
-user_role = st.session_state.get('role', 'user').strip().lower()
-if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
-    user_role = "admin"
-
-if user_role == 'admin':
-    st.sidebar.markdown("---")
-    st.sidebar.markdown('### <i class="fa-solid fa-bars" style="color: #ff4b4b; margin-right: 8px;"></i> Admin Controls', unsafe_allow_html=True)
-
-    if st.sidebar.button("📧 Email PDF Report to All Users", use_container_width=True):
-        try:
-            recipient_emails = get_all_registered_users()
-            
-            if not recipient_emails:
-                st.warning("No registered user emails found in the database.")
-            else:
-                sender_email = "warisansecurityalerts@gmail.com"
-                app_password = "zjmm vunm ngec wkvu"
-                success_count = 0
-                pdf_filename = "executive_threat_report.pdf"
-                
-                for recipient in recipient_emails:
-                    try:
-                        msg = MIMEMultipart()
-                        msg['From'] = sender_email
-                        msg['To'] = recipient
-                        msg['Subject'] = "[WARISAN SOC] Executive AI Threat & Malware Operations Report"
-                        
-                        body = "Attached is the latest automated executive threat intelligence report generated by Warisan Security Malware Operations."
-                        msg.attach(MIMEText(body, 'plain'))
-                        
-                        with open(pdf_filename, "rb") as f:
-                            attach = MIMEApplication(f.read(), Name=pdf_filename)
-                            attach['Content-Disposition'] = f'attachment; filename="{pdf_filename}"'
-                            msg.attach(attach)
-                        
-                        server = smtplib.SMTP('smtp.gmail.com', 587)
-                        server.starttls()
-                        server.login(sender_email, app_password)
-                        server.sendmail(sender_email, recipient, msg.as_string())
-                        server.quit()
-                        
-                        success_count += 1
-                    except Exception as inner_e:
-                        print(f"[-] Failed to send email to {recipient}: {inner_e}")
-                
-                st.success(f"Successfully broadcasted report to {success_count} out of {len(recipient_emails)} registered user(s)!")
-                
-        except Exception as e:
-            st.error(f"Broadcast failed: {e}")
-else:
-    st.sidebar.caption("🔒 *Multi-user PDF broadcast is restricted to Administrator accounts.*")
 
 # --- METRICS ROW ---
 m1, m2, m3, m4 = st.columns(4)
