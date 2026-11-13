@@ -110,7 +110,7 @@ if "temp_email" not in st.session_state:
 if "last_alerted_threat" not in st.session_state:
     st.session_state.last_alerted_threat = None
 
-# Auth View Navigation State ("Login", "Register", "Forgot Password")
+# Auth View Navigation State ("Login", "Register", "Forgot")
 if "auth_view" not in st.session_state:
     st.session_state["auth_view"] = "Login"
 
@@ -315,18 +315,18 @@ if not st.session_state["logged_in"]:
                     st.rerun()
 
         else:
-            # Custom view selector buttons acting as tabs
+            # Formal Segmented Navigation Control
             nav_col1, nav_col2, nav_col3 = st.columns(3)
             with nav_col1:
-                if st.button("🔑 Login", use_container_width=True, type="primary" if st.session_state["auth_view"] == "Login" else "secondary"):
+                if st.button("Sign In", use_container_width=True, type="primary" if st.session_state["auth_view"] == "Login" else "secondary"):
                     st.session_state["auth_view"] = "Login"
                     st.rerun()
             with nav_col2:
-                if st.button("📝 Register", use_container_width=True, type="primary" if st.session_state["auth_view"] == "Register" else "secondary"):
+                if st.button("Register", use_container_width=True, type="primary" if st.session_state["auth_view"] == "Register" else "secondary"):
                     st.session_state["auth_view"] = "Register"
                     st.rerun()
             with nav_col3:
-                if st.button("🔄 Reset", use_container_width=True, type="primary" if st.session_state["auth_view"] == "Forgot" else "secondary"):
+                if st.button("Recovery", use_container_width=True, type="primary" if st.session_state["auth_view"] == "Forgot" else "secondary"):
                     st.session_state["auth_view"] = "Forgot"
                     st.rerun()
 
@@ -373,16 +373,15 @@ if not st.session_state["logged_in"]:
                 reg_confirm_pass = st.text_input("Confirm Password", type="password", key="reg_confirm_password")
                 
                 st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-                if st.button("Register Now", use_container_width=True, type="primary"):
+                if st.button("Register Account", use_container_width=True, type="primary"):
                     if reg_user and reg_email and reg_pass and reg_confirm_pass:
                         if reg_pass == reg_confirm_pass:
                             success = register_user(reg_user, reg_email, reg_pass, "user")
                             if success:
-                                # Send welcome email
                                 with st.spinner("Sending confirmation email..."):
                                     send_welcome_email(reg_email, reg_user)
                                 
-                                st.success("Account successfully registered & confirmation email sent! Redirecting to login...")
+                                st.success("Account successfully registered & confirmation email sent! Redirecting to Sign In...")
                                 time.sleep(1.5)
                                 st.session_state["auth_view"] = "Login"
                                 st.rerun()
@@ -395,10 +394,10 @@ if not st.session_state["logged_in"]:
 
             elif st.session_state["auth_view"] == "Forgot":
                 if st.session_state["forgot_step"] == 1:
-                    st.subheader("Reset Password")
+                    st.subheader("Account Recovery")
                     reset_email_input = st.text_input("Enter your registered email address", key="reset_email")
                     
-                    if st.button("Send Reset Code", use_container_width=True, type="primary"):
+                    if st.button("Send Verification Code", use_container_width=True, type="primary"):
                         if reset_email_input:
                             try:
                                 conn = get_db_connection()
@@ -434,7 +433,7 @@ if not st.session_state["logged_in"]:
                     st.info(f"🔑 Verification code sent to: **{st.session_state['forgot_email']}**")
                     st.warning(f"💡 **[DEBUG BYPASS] Reset Code:** `{st.session_state['forgot_code']}`")
                     
-                    entered_reset_code = st.text_input("Enter 6-Digit Reset Code", key="entered_r_code")
+                    entered_reset_code = st.text_input("Enter 6-Digit Verification Code", key="entered_r_code")
                     new_password_input = st.text_input("Enter New Password", type="password", key="new_pword")
                     new_confirm_password_input = st.text_input("Confirm New Password", type="password", key="new_cpword")
                     
@@ -445,7 +444,7 @@ if not st.session_state["logged_in"]:
                                 if new_password_input == new_confirm_password_input:
                                     updated = update_user_password(st.session_state["forgot_email"], new_password_input)
                                     if updated:
-                                        st.success("Password successfully updated! Redirecting to login...")
+                                        st.success("Password successfully updated! Redirecting to Sign In...")
                                         st.session_state["forgot_step"] = 1
                                         st.session_state["forgot_email"] = ""
                                         st.session_state["forgot_code"] = ""
