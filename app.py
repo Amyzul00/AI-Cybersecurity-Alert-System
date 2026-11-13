@@ -800,78 +800,70 @@ def generate_pdf_report(dataframe):
     
     return buffer
 
-# --- SIDEBAR ---
+# ==========================================
+# SIDEBAR (ORGANIZED & EXPANDABLE SECTIONS)
+# ==========================================
 if logo_base64:
-    st.sidebar.markdown(f'<div style="text-align: center; margin-bottom: 15px;"><img src="{logo_base64}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 0 12px rgba(255,75,75,0.6);"></div>', unsafe_allow_html=True)
+    st.sidebar.markdown(f'<div style="text-align: center; margin-bottom: 12px;"><img src="{logo_base64}" style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 0 12px rgba(255,75,75,0.6);"></div>', unsafe_allow_html=True)
 
-st.sidebar.markdown(f"""
-    <div style="background-color: #0d2318; border: 1px solid #1e4630; border-radius: 8px; padding: 14px; margin-bottom: 15px;">
-        <p style="margin: 0; color: #4cd137; font-size: 1.05rem;">👤 User: <b>{st.session_state['username']}</b></p>
-        <p style="margin: 6px 0 0 0; color: #fbc531; font-size: 1.05rem;">🔑 Role: <b>{st.session_state['role'].upper()}</b></p>
-    </div>
-""", unsafe_allow_html=True)
+with st.sidebar.expander("👤 User Profile & Session", expanded=True):
+    st.markdown(f"""
+        <div style="background-color: #0d2318; border: 1px solid #1e4630; border-radius: 8px; padding: 12px; margin-bottom: 10px;">
+            <p style="margin: 0; color: #4cd137; font-size: 0.95rem;">👤 User: <b>{st.session_state['username']}</b></p>
+            <p style="margin: 4px 0 0 0; color: #fbc531; font-size: 0.95rem;">🔑 Role: <b>{st.session_state['role'].upper()}</b></p>
+        </div>
+    """, unsafe_allow_html=True)
+    if st.button("🚪 Sign Out", use_container_width=True):
+        st.session_state["logged_in"] = False
+        st.session_state["username"] = ""
+        st.session_state["role"] = ""
+        st.session_state["email"] = None
+        st.session_state["user_email"] = None
+        st.rerun()
 
-if st.sidebar.button("🚪 Logout", use_container_width=True):
-    st.session_state["logged_in"] = False
-    st.session_state["username"] = ""
-    st.session_state["role"] = ""
-    st.session_state["email"] = None
-    st.session_state["user_email"] = None
-    st.rerun()
+with st.sidebar.expander("🚨 Alert & Notification Center", expanded=False):
+    recent_threats = fetch_recent_threats(limit=10)
+    if recent_threats:
+        for threat in recent_threats:
+            threat_id = threat["id"]
+            src_ip = threat["src_ip"]
+            threat_type = threat["threat_type"]
+            severity = threat["severity"]
+            
+            if severity.lower() in ["high", "critical"]:
+                alert_flag_key = f"email_sent_threat_{threat_id}"
+                if not st.session_state.get(alert_flag_key, False):
+                    send_security_alert_to_all(src_ip, threat_type)
+                    st.session_state[alert_flag_key] = True
+                    st.success(f"Alert broadcasted for ID #{threat_id}!")
+    else:
+        st.caption("No recent threat alerts logged.")
 
-st.sidebar.divider()
-st.sidebar.subheader("🚨 Notification & Alert Center")
+with st.sidebar.expander("🎛️ Filter & Analysis Controls", expanded=True):
+    selected_threats = st.multiselect(
+        "Select Threat Categories:",
+        options=df["Threat"].unique() if not df.empty else [],
+        default=list(df["Threat"].unique()) if not df.empty else [],
+    )
+    filtered_df = df[df["Threat"].isin(selected_threats)] if not df.empty else df
 
-recent_threats = fetch_recent_threats(limit=10)
+with st.sidebar.expander("📡 Live Stream Telemetry", expanded=False):
+    stream_live = st.toggle("Enable Live Packet Feed", value=False)
+    if stream_live:
+        st.info("📡 Listening to active socket interface...")
+        time.sleep(1.5)
+        st.rerun()
 
-if recent_threats:
-    for threat in recent_threats:
-        threat_id = threat["id"]
-        src_ip = threat["src_ip"]
-        threat_type = threat["threat_type"]
-        severity = threat["severity"]
-        
-        if severity.lower() in ["high", "critical"]:
-            alert_flag_key = f"email_sent_threat_{threat_id}"
-            if not st.session_state.get(alert_flag_key, False):
-                send_security_alert_to_all(src_ip, threat_type)
-                st.session_state[alert_flag_key] = True
-                st.sidebar.success(f"Alert email broadcasted for Threat ID #{threat_id}!")
-else:
-    st.sidebar.caption("No recent threat alerts logged yet.")
-
-st.sidebar.divider()
-st.sidebar.header("Filter & Controls")
-
-selected_threats = st.sidebar.multiselect(
-    "Select Threat Types:",
-    options=df["Threat"].unique() if not df.empty else [],
-    default=list(df["Threat"].unique()) if not df.empty else [],
-)
-
-filtered_df = df[df["Threat"].isin(selected_threats)] if not df.empty else df
-
-st.sidebar.divider()
-st.sidebar.subheader("🔴 Live Stream Simulation")
-stream_live = st.sidebar.toggle("Enable Real-Time Packet Stream", value=False)
-
-if stream_live:
-    st.sidebar.info("📡 Listening to active socket interface... Streaming telemetry.")
-    time.sleep(1.5)
-    st.rerun()
-
-st.sidebar.divider()
-st.sidebar.subheader("🛡️ Incident Response (SOAR)")
-target_ip = st.sidebar.selectbox(
-    "Select IP to Remediate:",
-    options=filtered_df["IP"].unique() if not filtered_df.empty else ["N/A"],
-)
-
-if st.sidebar.button("🚨 Block IP & Push Firewall Rule") and target_ip != "N/A":
-    with st.spinner(f"Pushing rule to iptables / Cloud Firewall for {target_ip}..."):
-        time.sleep(1.0)
-    handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated via firewall rule (User: {st.session_state['username']}).", is_critical=True)
-    st.sidebar.success(f"Successfully isolated host {target_ip}!")
+with st.sidebar.expander("🛡️ Incident Response (SOAR)", expanded=False):
+    target_ip = st.selectbox(
+        "Select Host IP to Isolate:",
+        options=filtered_df["IP"].unique() if not filtered_df.empty else ["N/A"],
+    )
+    if st.button("🚨 Block IP & Push Firewall Rule", type="primary") and target_ip != "N/A":
+        with st.spinner(f"Pushing rule to iptables for {target_ip}..."):
+            time.sleep(1.0)
+        handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated (User: {st.session_state['username']}).", is_critical=True)
+        st.success(f"Successfully isolated host {target_ip}!")
 
 # --- METRICS ROW ---
 m1, m2, m3, m4 = st.columns(4)
