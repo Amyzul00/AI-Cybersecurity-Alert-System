@@ -1069,8 +1069,13 @@ st.divider()
 
 # --- EVENT LOG TABLE ---
 st.subheader("🔍 Real-Time Threat Event Log")
+
+# Reset index to start from 1 instead of 0
+display_df = filtered_df.copy()
+display_df.index = range(1, len(display_df) + 1)
+
 st.dataframe(
-    filtered_df,
+    display_df,
     use_container_width=True,
     column_config={
         "IP": st.column_config.TextColumn("IP Address", help="Target IP"),
