@@ -32,6 +32,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 import streamlit as st
+import mysql.connector
 import sqlite3
 
 # --- PAGE CONFIGURATION ---
@@ -63,6 +64,9 @@ if "temp_role" not in st.session_state:
 if "temp_email" not in st.session_state:
     st.session_state["temp_email"] = ""
 
+if "last_alerted_threat" not in st.session_state:
+    st.session_state.last_alerted_threat = None
+
 # ==========================================
 # HELPER: BASE64 IMAGE ENCODING
 # ==========================================
@@ -82,6 +86,75 @@ logo_base64 = get_base64_image("Logo.png")
 def verify_password(plain_password, stored_password):
     """Verify plain password against stored database password."""
     return plain_password == stored_password
+
+# ==========================================
+# AUTOMATED MYSQL EMAIL & ALERT FUNCTIONS
+# ==========================================
+def get_registered_user_emails():
+    """Fetches all non-empty email addresses from XAMPP MySQL (cybersecurity_db.users)."""
+    emails = []
+    try:
+        conn = mysql.connector.connect(
+            host="localhost",
+            user="root",       # Default XAMPP MySQL user
+            password="",       # Default XAMPP MySQL password (empty)
+            database="cybersecurity_db"
+        )
+        cursor = conn.cursor()
+        # Only select valid, non-empty emails where @ exists
+        cursor.execute("SELECT email FROM users WHERE email IS NOT NULL AND email != ''")
+        results = cursor.fetchall()
+        emails = [row[0].strip() for row in results if row and "@" in str(row[0])]
+        
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Database error fetching user emails: {e}")
+    return emails
+
+def auto_send_lstm_threat_alert(threat_label, confidence_score=None):
+    """Automatically emails all registered users when the Deep LSTM model flags a threat."""
+    recipient_emails = get_registered_user_emails()
+    
+    if not recipient_emails:
+        return 0
+
+    SENDER_EMAIL = "warisansecurityalerts@gmail.com"
+    SENDER_PASSWORD = "zjmm vunm ngec wkvu"
+
+    subject = f"🚨 SECURITY ALERT: {threat_label} Detected!"
+    conf_text = f"\nModel Confidence: {confidence_score:.2f}%" if confidence_score else ""
+    
+    body = f"""
+    WARNING: The Deep LSTM Intrusion Detection System has detected a potential threat.
+
+    Threat Classification: {threat_label}{conf_text}
+    Database Source: cybersecurity_db
+
+    Please check the security dashboard immediately for detailed logs and mitigation steps.
+    """
+
+    sent_count = 0
+    try:
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(SENDER_EMAIL, SENDER_PASSWORD)
+
+        for email in recipient_emails:
+            msg = MIMEMultipart()
+            msg["From"] = SENDER_EMAIL
+            msg["To"] = email
+            msg["Subject"] = subject
+            msg.attach(MIMEText(body, "plain"))
+
+            server.sendmail(SENDER_EMAIL, email, msg.as_string())
+            sent_count += 1
+
+        server.quit()
+    except Exception as e:
+        print(f"Failed to send auto-alert email: {e}")
+
+    return sent_count
 
 # ==========================================
 # EMAIL NOTIFICATION FUNCTIONS (WELCOME & OTP 2FA)
@@ -182,7 +255,6 @@ if not st.session_state["logged_in"]:
                             conn.close()
                             
                             if user_record and verify_password(password, user_record[1]):
-                                # Fetch email for session record
                                 conn_email = sqlite3.connect("threat_logs.db")
                                 cur_email = conn_email.cursor()
                                 cur_email.execute("SELECT email FROM users WHERE username = ?", (user_record[0],))
@@ -785,6 +857,29 @@ st.dataframe(
 )
 
 # ==========================================
+# 11.5 Automated Deep LSTM Threat Check & Trigger
+# ==========================================
+predicted_class = "DDoS"   # e.g., "Normal", "DDoS", "Bot", "PortScan"
+confidence = 98.45         # Model confidence percentage
+
+if predicted_class.lower() != "normal":
+    st.error(f"🚨 Deep LSTM Threat Detected: **{predicted_class}** ({confidence:.2f}%)")
+
+    if st.session_state.last_alerted_threat != predicted_class:
+        with st.spinner("Auto-broadcasting threat alert to registered XAMPP users..."):
+            sent_count = auto_send_lstm_threat_alert(predicted_class, confidence)
+            
+            if sent_count > 0:
+                st.toast(f"🚨 Threat alert auto-sent to {sent_count} user(s)!", icon="📧")
+                st.session_state.last_alerted_threat = predicted_class
+            else:
+                st.warning("Threat detected, but no valid user emails were found in `cybersecurity_db`.")
+else:
+    st.session_state.last_alerted_threat = None
+
+st.divider()
+
+# ==========================================
 # 12. Diagnostics Logs & Export Options
 # ==========================================
 col_logs, col_download = st.columns([3, 1])
@@ -835,16 +930,10 @@ with col_download:
 
         if st.button("📧 Email PDF Report to All Users"):
             try:
-                conn = sqlite3.connect("threat_logs.db")
-                cursor = conn.cursor()
-                cursor.execute("SELECT email FROM users")
-                rows = cursor.fetchall()
-                conn.close()
-                
-                recipient_emails = [row[0] for row in rows if row[0]]
+                recipient_emails = get_registered_user_emails()
                 
                 if not recipient_emails:
-                    st.warning("No registered user emails found in the database.")
+                    st.warning("No registered user emails found in the XAMPP database.")
                 else:
                     sender_email = "warisansecurityalerts@gmail.com"
                     app_password = "zjmm vunm ngec wkvu"
@@ -877,9 +966,9 @@ with col_download:
                         except Exception as inner_e:
                             print(f"[-] Failed to send email to {recipient}: {inner_e}")
                     
-                    st.success(f"Successfully broadcasted report to {success_count} registered user(s)!")
+                    st.success(f"Successfully broadcasted report to {success_count} out of {len(recipient_emails)} registered user(s) from XAMPP!")
                     
             except Exception as e:
-                st.error(f"Broadcast failed: {e}")
+                st.error(f"XAMPP Database Connection or Broadcast failed: {e}")
     else:
         st.caption("🔒 *Multi-user PDF broadcast is restricted to Administrator accounts.*")
