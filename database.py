@@ -17,7 +17,6 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        # Create threat_logs table if it doesn't exist
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS threat_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,7 +31,6 @@ def init_db():
             )
         ''')
 
-        # Create users table if it doesn't exist
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,7 +88,6 @@ def fetch_recent_threats(limit=50):
             (int(limit),)
         )
         rows = cursor.fetchall()
-        # Convert sqlite3.Row objects to dictionaries to match pymysql behavior
         return [dict(row) for row in rows]
     finally:
         cursor.close()

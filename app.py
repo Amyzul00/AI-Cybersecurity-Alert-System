@@ -85,10 +85,10 @@ def verify_password(plain_password, stored_password):
     return plain_password == stored_password
 
 # ==========================================
-# AUTOMATED MYSQL EMAIL & ALERT FUNCTIONS
+# AUTOMATED EMAIL & ALERT FUNCTIONS
 # ==========================================
 def auto_send_lstm_threat_alert(threat_label, confidence_score=None):
-    """Automatically emails ALL registered users from MySQL when the Deep LSTM model flags a threat."""
+    """Automatically emails ALL registered users when the Deep LSTM model flags a threat."""
     recipient_emails = get_all_registered_users()
     
     if not recipient_emails:
@@ -104,7 +104,7 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=None):
     WARNING: The Deep LSTM Intrusion Detection System has detected a potential threat.
 
     Threat Classification: {threat_label}{conf_text}
-    Database Source: MySQL cybersecurity_db
+    Database Source: Cloud SQLite Database
 
     Please check the security dashboard immediately for detailed logs and mitigation steps.
     """
@@ -199,7 +199,7 @@ if not st.session_state["logged_in"]:
                         try:
                             conn = get_db_connection()
                             cursor = conn.cursor()
-                            cursor.execute("SELECT username, password, role, email FROM users WHERE username = %s OR email = %s", (username_input, username_input))
+                            cursor.execute("SELECT username, password, role, email FROM users WHERE username = ? OR email = ?", (username_input, username_input))
                             user_record = cursor.fetchone()
                             cursor.close()
                             conn.close()
@@ -706,7 +706,7 @@ if predicted_class.lower() != "normal":
     st.error(f"🚨 Deep LSTM Threat Detected: **{predicted_class}** ({confidence:.2f}%)")
 
     if st.session_state.last_alerted_threat != predicted_class:
-        with st.spinner("Auto-broadcasting threat alert to all registered users in MySQL..."):
+        with st.spinner("Auto-broadcasting threat alert to all registered users..."):
             sent_count = auto_send_lstm_threat_alert(predicted_class, confidence)
             
             if sent_count > 0:
