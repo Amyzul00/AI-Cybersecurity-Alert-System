@@ -81,8 +81,11 @@ if "forgot_code" not in st.session_state:
 if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
     st.session_state.role = "admin"
 
-# --- HIDE TOP-RIGHT HEADER CONTROLS (MANAGE APP, GITHUB, ETC.) FOR NON-ADMINS ---
+# --- HIDE TOP-RIGHT HEADER CONTROLS FOR NON-ADMINS ---
 user_role = st.session_state.get('role', 'user').strip().lower()
+if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
+    user_role = "admin"
+
 if user_role != 'admin':
     st.markdown("""
         <style>
@@ -847,30 +850,30 @@ with st.sidebar.expander("🎛️ Filter & Analysis Controls", expanded=True):
     )
     filtered_df = df[df["Threat"].isin(selected_threats)] if not df.empty else df
 
-with st.sidebar.expander("📡 Live Stream Telemetry", expanded=False):
-    stream_live = st.toggle("Enable Live Packet Feed", value=False)
-    if stream_live:
-        st.info("📡 Listening to active socket interface...")
-        time.sleep(1.5)
-        st.rerun()
-
-with st.sidebar.expander("🛡️ Incident Response (SOAR)", expanded=False):
-    target_ip = st.selectbox(
-        "Select Host IP to Isolate:",
-        options=filtered_df["IP"].unique() if not filtered_df.empty else ["N/A"],
-    )
-    if st.button("🚨 Block IP & Push Firewall Rule", type="primary") and target_ip != "N/A":
-        with st.spinner(f"Pushing rule to iptables for {target_ip}..."):
-            time.sleep(1.0)
-        handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated (User: {st.session_state['username']}).", is_critical=True)
-        st.success(f"Successfully isolated host {target_ip}!")
-
-# --- ADMIN CONTROLS IN SIDEBAR (RESTRICTED TO ADMIN) ---
+# --- ADMIN-ONLY SECTIONS (LIVE STREAM TELEMETRY & SOAR) ---
 user_role = st.session_state.get('role', 'user').strip().lower()
 if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
     user_role = "admin"
 
 if user_role == 'admin':
+    with st.sidebar.expander("📡 Live Stream Telemetry", expanded=False):
+        stream_live = st.toggle("Enable Live Packet Feed", value=False)
+        if stream_live:
+            st.info("📡 Listening to active socket interface...")
+            time.sleep(1.5)
+            st.rerun()
+
+    with st.sidebar.expander("🛡️ Incident Response (SOAR)", expanded=False):
+        target_ip = st.selectbox(
+            "Select Host IP to Isolate:",
+            options=filtered_df["IP"].unique() if not filtered_df.empty else ["N/A"],
+        )
+        if st.button("🚨 Block IP & Push Firewall Rule", type="primary") and target_ip != "N/A":
+            with st.spinner(f"Pushing rule to iptables for {target_ip}..."):
+                time.sleep(1.0)
+            handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated (User: {st.session_state['username']}).", is_critical=True)
+            st.success(f"Successfully isolated host {target_ip}!")
+
     st.sidebar.markdown("---")
     st.sidebar.markdown("### Admin Controls")
 
@@ -934,7 +937,7 @@ if user_role == 'admin':
         use_container_width=True,
     )
 else:
-    st.sidebar.caption("🔒 *Admin controls & report downloads are restricted to Administrator accounts.*")
+    st.sidebar.caption("🔒 *Admin controls, Live Telemetry & SOAR incident tools are restricted to Administrator accounts.*")
 
 # --- METRICS ROW ---
 m1, m2, m3, m4 = st.columns(4)
@@ -1095,7 +1098,7 @@ st.dataframe(
     },
 )
 
-# --- DEEP LSTM DIAGNOSTICS & LOGS (POSITIONED BELOW THREAT EVENT LOG) ---
+# --- DEEP LSTM DIAGNOSTICS & LOGS ---
 with st.expander("🔬 Show Deep LSTM Layer Diagnostics & Neural Network Logs"):
     st.code(
         """
