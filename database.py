@@ -27,7 +27,6 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        # Create threat_logs table if it doesn't exist
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS threat_logs (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -42,7 +41,6 @@ def init_db():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         ''')
 
-        # Create users table if it doesn't exist
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -129,10 +127,9 @@ def get_all_registered_users():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT email FROM users")
+        cursor.execute("SELECT email FROM users WHERE email IS NOT NULL AND email != ''")
         rows = cursor.fetchall()
-        # Extract emails into a list
-        return [row['email'] for row in rows if row['email']]
+        return [row['email'].strip() for row in rows if row['email'] and "@" in str(row['email'])]
     finally:
         cursor.close()
         conn.close()
