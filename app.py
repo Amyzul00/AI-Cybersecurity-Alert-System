@@ -44,7 +44,7 @@ st.set_page_config(
 # --- FONT AWESOME CDN FOR SIDEBAR ICONS ---
 st.markdown('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">', unsafe_allow_html=True)
 
-# --- ELITE SOC AUTH & GLOBAL STYLING ---
+# --- ELITE SOC AUTH & GLOBAL STYLING (HIDING STREAMLIT DEFAULT TOP-RIGHT TOOLBAR) ---
 st.markdown("""
     <style>
     .block-container {
@@ -54,6 +54,17 @@ st.markdown("""
     .stApp {
         background: radial-gradient(circle at 50% 30%, #121826 0%, #080a0f 70%);
         color: #e2e8f0;
+    }
+
+    /* Hide default Streamlit top-right toolbar (Share, Star, Edit, etc.) */
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+    }
+    .stAppToolbar {
+        display: none !important;
+    }
+    button[data-testid="baseButton-header"] {
+        display: none !important;
     }
 
     /* Modern SOC Auth Card Container */
