@@ -16,6 +16,7 @@ import smtplib
 import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
 from PIL import Image
 import pandas as pd
 import plotly.express as px
@@ -38,6 +39,9 @@ st.set_page_config(
     page_icon="Logo.png",
     layout="wide",
 )
+
+# --- FONT AWESOME CDN FOR SIDEBAR ICONS ---
+st.markdown('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">', unsafe_allow_html=True)
 
 # --- ELITE SOC AUTH & GLOBAL STYLING ---
 st.markdown("""
@@ -197,12 +201,10 @@ def send_security_alert_to_all(src_ip, threat_type):
     return auto_send_lstm_threat_alert(threat_type)
 
 def send_welcome_email(recipient_email, username):
-    """Sends a beautifully styled HTML welcome notification email matching the SOC dark/red theme."""
     SENDER_EMAIL = "warisansecurityalerts@gmail.com"
     SENDER_PASSWORD = "zjmm vunm ngec wkvu"
     
     subject = "🛡️ [WARISAN SOC] Account Successfully Registered"
-    
     logo_b64 = get_base64_image("Logo.png")
     logo_img_tag = f'<img src="{logo_b64}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b;" alt="Logo">' if logo_b64 else '<span style="font-size: 2rem;">🛡️</span>'
 
@@ -298,19 +300,14 @@ def send_welcome_email(recipient_email, username):
                         </tr>
                     </table>
                 </div>
-                
                 <div class="greeting">Hello {username},</div>
-                
                 <div class="badge">✓ Account Successfully Registered</div>
-                
                 <div class="message">
                     Your account for the Warisan Security Malware Operations SOC Portal has been successfully created and secured with 2FA privileges.
                 </div>
-                
                 <div class="message">
                     You can now log in using your credentials to access real-time AI threat detection dashboards, Deep LSTM analytics, and automated SOAR incident response tools.
                 </div>
-                
                 <div class="footer">
                     Warisan Security Operations Center (SOC) Automated Notification Service<br>
                     This is a secure automated notification. Please do not reply directly to this email.
@@ -340,7 +337,6 @@ def send_welcome_email(recipient_email, username):
         return False
 
 def send_password_reset_email(recipient_email, reset_code):
-    """Sends a password reset verification code via Gmail SMTP."""
     SENDER_EMAIL = "warisansecurityalerts@gmail.com"
     SENDER_PASSWORD = "zjmm vunm ngec wkvu"
     
@@ -434,7 +430,6 @@ if not st.session_state["logged_in"]:
                     st.rerun()
 
         else:
-            # Formal Segmented Navigation Control
             nav_col1, nav_col2, nav_col3 = st.columns(3)
             with nav_col1:
                 if st.button("Sign In", use_container_width=True, type="primary" if st.session_state["auth_view"] == "Login" else "secondary"):
@@ -803,6 +798,16 @@ def generate_pdf_report(dataframe):
 # ==========================================
 # SIDEBAR (ORGANIZED & EXPANDABLE SECTIONS)
 # ==========================================
+st.sidebar.markdown(
+    """
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 5px 15px 5px; border-bottom: 1px solid #1f2937; margin-bottom: 15px;">
+        <span style="font-size: 1.1rem; font-weight: bold; color: #ffffff;">Navigation</span>
+        <i class="fa-solid fa-ellipsis-vertical" style="color: #94a3b8; font-size: 1.2rem;" title="Options"></i>
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
+
 if logo_base64:
     st.sidebar.markdown(f'<div style="text-align: center; margin-bottom: 12px;"><img src="{logo_base64}" style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 0 12px rgba(255,75,75,0.6);"></div>', unsafe_allow_html=True)
 
@@ -864,6 +869,59 @@ with st.sidebar.expander("🛡️ Incident Response (SOAR)", expanded=False):
             time.sleep(1.0)
         handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated (User: {st.session_state['username']}).", is_critical=True)
         st.success(f"Successfully isolated host {target_ip}!")
+
+# --- ADMIN CONTROLS IN SIDEBAR WITH FONT AWESOME ICON ---
+user_role = st.session_state.get('role', 'user').strip().lower()
+if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
+    user_role = "admin"
+
+if user_role == 'admin':
+    st.sidebar.markdown("---")
+    st.sidebar.markdown('### <i class="fa-solid fa-bars" style="color: #ff4b4b; margin-right: 8px;"></i> Admin Controls', unsafe_allow_html=True)
+
+    if st.sidebar.button("📧 Email PDF Report to All Users", use_container_width=True):
+        try:
+            recipient_emails = get_all_registered_users()
+            
+            if not recipient_emails:
+                st.warning("No registered user emails found in the database.")
+            else:
+                sender_email = "warisansecurityalerts@gmail.com"
+                app_password = "zjmm vunm ngec wkvu"
+                success_count = 0
+                pdf_filename = "executive_threat_report.pdf"
+                
+                for recipient in recipient_emails:
+                    try:
+                        msg = MIMEMultipart()
+                        msg['From'] = sender_email
+                        msg['To'] = recipient
+                        msg['Subject'] = "[WARISAN SOC] Executive AI Threat & Malware Operations Report"
+                        
+                        body = "Attached is the latest automated executive threat intelligence report generated by Warisan Security Malware Operations."
+                        msg.attach(MIMEText(body, 'plain'))
+                        
+                        with open(pdf_filename, "rb") as f:
+                            attach = MIMEApplication(f.read(), Name=pdf_filename)
+                            attach['Content-Disposition'] = f'attachment; filename="{pdf_filename}"'
+                            msg.attach(attach)
+                        
+                        server = smtplib.SMTP('smtp.gmail.com', 587)
+                        server.starttls()
+                        server.login(sender_email, app_password)
+                        server.sendmail(sender_email, recipient, msg.as_string())
+                        server.quit()
+                        
+                        success_count += 1
+                    except Exception as inner_e:
+                        print(f"[-] Failed to send email to {recipient}: {inner_e}")
+                
+                st.success(f"Successfully broadcasted report to {success_count} out of {len(recipient_emails)} registered user(s)!")
+                
+        except Exception as e:
+            st.error(f"Broadcast failed: {e}")
+else:
+    st.sidebar.caption("🔒 *Multi-user PDF broadcast is restricted to Administrator accounts.*")
 
 # --- METRICS ROW ---
 m1, m2, m3, m4 = st.columns(4)
@@ -1049,7 +1107,7 @@ else:
 st.divider()
 
 # ==========================================
-# DIAGNOSTICS LOGS & EXPORT OPTIONS
+# DIAGNOSTICS LOGS & EXPORT OPTIONS (ADMIN ONLY)
 # ==========================================
 col_logs, col_download = st.columns([3, 1])
 
@@ -1070,71 +1128,30 @@ with col_logs:
 
 with col_download:
     st.write(" ")
-    csv_data = filtered_df.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        label="📥 Download CSV",
-        data=csv_data,
-        file_name="warisan_security_malware_operations_report.csv",
-        mime="text/csv",
-        use_container_width=True,
-    )
-
-    pdf_buffer = generate_pdf_report(filtered_df)
-    st.download_button(
-        label="📄 Download PDF Report",
-        data=pdf_buffer,
-        file_name="executive_threat_report.pdf",
-        mime="application/pdf",
-        use_container_width=True,
-    )
-
-    user_role = st.session_state.get('role', 'user').strip().lower()
-    
     if user_role == 'admin':
-        st.markdown("---")
-        st.markdown("### 👑 Admin Controls")
+        csv_data = filtered_df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="📥 Download CSV",
+            data=csv_data,
+            file_name="warisan_security_malware_operations_report.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
 
-        if st.button("📧 Email PDF Report to All Users"):
-            try:
-                recipient_emails = get_all_registered_users()
-                
-                if not recipient_emails:
-                    st.warning("No registered user emails found in the database.")
-                else:
-                    sender_email = "warisansecurityalerts@gmail.com"
-                    app_password = "zjmm vunm ngec wkvu"
-                    success_count = 0
-                    pdf_filename = "executive_threat_report.pdf"
-                    
-                    for recipient in recipient_emails:
-                        try:
-                            msg = MIMEMultipart()
-                            msg['From'] = sender_email
-                            msg['To'] = recipient
-                            msg['Subject'] = "[WARISAN SOC] Executive AI Threat & Malware Operations Report"
-                            
-                            body = "Attached is the latest automated executive threat intelligence report generated by Warisan Security Malware Operations."
-                            msg.attach(MIMEText(body, 'plain'))
-                            
-                            with open(pdf_filename, "rb") as f:
-                                attach = MIMEApplication(f.read(), Name=pdf_filename)
-                                attach['Content-Disposition'] = f'attachment; filename="{pdf_filename}"'
-                                msg.attach(attach)
-                            
-                            server = smtplib.SMTP('smtp.gmail.com', 587)
-                            server.starttls()
-                            server.login(sender_email, app_password)
-                            server.sendmail(sender_email, recipient, msg.as_string())
-                            server.quit()
-                            
-                            success_count += 1
-                            print(f"[+] Successfully sent report to {recipient}")
-                        except Exception as inner_e:
-                            print(f"[-] Failed to send email to {recipient}: {inner_e}")
-                    
-                    st.success(f"Successfully broadcasted report to {success_count} out of {len(recipient_emails)} registered user(s)!")
-                    
-            except Exception as e:
-                st.error(f"Broadcast failed: {e}")
+        pdf_buffer = generate_pdf_report(filtered_df)
+        st.download_button(
+            label="📄 Download PDF Report",
+            data=pdf_buffer,
+            file_name="executive_threat_report.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
     else:
-        st.caption("🔒 *Multi-user PDF broadcast is restricted to Administrator accounts.*")
+        st.caption("🔒 *CSV & PDF downloads are restricted to Administrator accounts.*")
+
+# --- FOOTER ---
+st.markdown("""
+    <div style="text-align: center; margin-top: 40px; padding: 20px 0; border-top: 1px solid #1f2937; color: #64748b; font-size: 0.85rem;">
+        Warisan Security Operations Center (SOC) • Enterprise Threat Intelligence & Automated SOAR Framework
+    </div>
+""", unsafe_allow_html=True)
