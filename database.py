@@ -13,7 +13,7 @@ def get_db_connection():
 
 
 def init_db():
-    """Initialize threat logs and user tables with robust schema validation."""
+    """Initialize threat logs and user tables with robust schema validation and default seeding."""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -41,6 +41,21 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+
+        # --- SEED DEFAULT USERS (PREVENTS ACCOUNT LOSS ON RESTART) ---
+        default_users = [
+            ("Admin", "warisansecurityalerts@gmail.com", "admin", "Admin123"),
+            ("Ameyzul", "ikmalmeyzul@gmail.com", "user", "Ameyzul123")
+        ]
+
+        for uname, uemail, urole, upass in default_users:
+            cursor.execute("SELECT id FROM users WHERE email = ?", (uemail,))
+            if not cursor.fetchone():
+                cursor.execute(
+                    "INSERT INTO users (username, email, role, password) VALUES (?, ?, ?, ?)",
+                    (uname, uemail, urole, upass)
+                )
+
         conn.commit()
         print(f"[+] SQLite Database initialized successfully: {DB_NAME}")
     except Exception as e:
