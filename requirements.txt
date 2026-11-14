@@ -5,6 +5,6 @@ pillow
 reportlab
 pymysql
 joblib
+scikit-learn
 torch
 scapy
-scikit-learn
