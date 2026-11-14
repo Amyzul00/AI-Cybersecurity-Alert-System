@@ -11,6 +11,7 @@ import threat_detector
 import base64
 from datetime import datetime
 from io import BytesIO
+import os
 import random
 import smtplib
 import time
@@ -87,7 +88,6 @@ st.markdown('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs
 # --- HIDE TOP-RIGHT TOOLBAR BUTTONS (KEEPING THREE-DOT MENU) ---
 st.markdown("""
     <style>
-    /* Hide specific toolbar action buttons while preserving the main menu container */
     [data-testid="stToolbar"] > div:not(:last-child) {
         display: none !important;
     }
@@ -105,8 +105,6 @@ st.markdown("""
         background: radial-gradient(circle at 50% 30%, #121826 0%, #080a0f 70%);
         color: #e2e8f0;
     }
-
-    /* Modern SOC Auth Card Container */
     div[data-testid="column"]:nth-of-type(2) {
         background: linear-gradient(145deg, #121824 0%, #0b0f17 100%);
         padding: 40px 44px;
@@ -115,8 +113,6 @@ st.markdown("""
         border: 1px solid rgba(255, 75, 75, 0.25);
         margin-top: 2vh;
     }
-
-    /* Polished Form Inputs */
     div[data-testid="column"]:nth-of-type(2) input {
         background-color: #080a0f !important;
         border: 1px solid #1f2937 !important;
@@ -128,8 +124,6 @@ st.markdown("""
         border-color: #ff4b4b !important;
         box-shadow: 0 0 8px rgba(255, 75, 75, 0.4) !important;
     }
-
-    /* Dashboard Metric Cards */
     div[data-testid="stMetricValue"] { font-size: 1.8rem; font-weight: 700; color: #f8fafc; }
     div[data-testid="stMetric"] {
         background: linear-gradient(135deg, #121824 0%, #0d1117 100%);
@@ -145,8 +139,10 @@ st.markdown("""
 # ==========================================
 # HELPER: BASE64 IMAGE ENCODING
 # ==========================================
-def get_base64_image(image_path):
+def get_base64_image(image_filename="Logo.png"):
     try:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        image_path = os.path.join(base_path, image_filename)
         with open(image_path, "rb") as img_file:
             encoded = base64.b64encode(img_file.read()).decode()
             return f"data:image/png;base64,{encoded}"
@@ -162,7 +158,7 @@ def verify_password(plain_password, stored_password):
     return plain_password == stored_password
 
 # ==========================================
-# AUTOMATED EMAIL & ALERT FUNCTIONS
+# AUTOMATED EMAIL & ALERT FUNCTIONS (GMAIL SAFE)
 # ==========================================
 def auto_send_lstm_threat_alert(threat_label, confidence_score=98.45, target_ip="192.168.1.96"):
     recipient_emails = get_all_registered_users()
@@ -176,8 +172,6 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=98.45, target_ip=
 
     subject = f"🚨 [WARISAN SOC] CRITICAL THREAT DETECTED: {threat_label}"
     timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
-    logo_b64 = get_base64_image("Logo.png")
-    logo_img_tag = f'<img src="{logo_b64}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b;" alt="Logo">' if logo_b64 else '<span style="font-size: 2rem;">🚨</span>'
 
     html_body = f"""
     <!DOCTYPE html>
@@ -185,102 +179,34 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=98.45, target_ip=
     <head>
         <meta charset="UTF-8">
         <style>
-            body {{
-                background-color: #0b0f17;
-                color: #e2e8f0;
-                font-family: Arial, sans-serif;
-                margin: 0;
-                padding: 20px;
-            }}
-            .email-container {{
-                max-width: 580px;
-                margin: 0 auto;
-                background-color: #121824;
-                border-radius: 14px;
-                border: 1px solid #1f2937;
-                padding: 30px;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.6);
-            }}
-            .header {{
-                border-bottom: 1px solid #1f2937;
-                padding-bottom: 15px;
-                margin-bottom: 22px;
-            }}
-            .title {{
-                font-size: 1.25rem;
-                font-weight: bold;
-                color: #ffffff;
-                margin: 0;
-            }}
-            .subtitle {{
-                font-size: 0.78rem;
-                color: #94a3b8;
-                margin: 3px 0 0 0;
-            }}
-            .alert-card {{
-                background-color: #1e1517;
-                border: 1px solid rgba(255, 75, 75, 0.4);
-                border-radius: 10px;
-                padding: 20px;
-                margin-bottom: 22px;
-            }}
-            .alert-header {{
-                color: #ff8080;
-                font-size: 0.95rem;
-                font-weight: bold;
-                letter-spacing: 0.5px;
-                margin-bottom: 12px;
-            }}
-            .alert-row {{
-                font-size: 0.92rem;
-                color: #f8fafc;
-                margin-bottom: 8px;
-            }}
-            .alert-row b {{
-                color: #ffffff;
-            }}
-            .description {{
-                font-size: 0.88rem;
-                color: #94a3b8;
-                line-height: 1.5;
-                margin-bottom: 20px;
-            }}
-            .footer {{
-                margin-top: 25px;
-                padding-top: 15px;
-                border-top: 1px solid #1f2937;
-                font-size: 0.72rem;
-                color: #64748b;
-                text-align: center;
-            }}
+            body {{ background-color: #f4f6f9; color: #333333; font-family: Arial, sans-serif; margin: 0; padding: 20px; }}
+            .email-container {{ max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; border: 1px solid #dcdde1; padding: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }}
+            .header {{ border-bottom: 2px solid #ff4b4b; padding-bottom: 15px; margin-bottom: 20px; }}
+            .title {{ font-size: 1.25rem; font-weight: bold; color: #1e272e; margin: 0; }}
+            .subtitle {{ font-size: 0.8rem; color: #718093; margin: 4px 0 0 0; }}
+            .alert-card {{ background-color: #fff5f5; border: 1px solid #feb2b2; border-left: 5px solid #e53e3e; border-radius: 6px; padding: 16px; margin-bottom: 20px; }}
+            .alert-header {{ color: #c53030; font-size: 0.95rem; font-weight: bold; margin-bottom: 10px; }}
+            .alert-row {{ font-size: 0.92rem; color: #2d3748; margin-bottom: 6px; }}
+            .description {{ font-size: 0.88rem; color: #4a5568; line-height: 1.5; margin-bottom: 20px; }}
+            .footer {{ margin-top: 25px; padding-top: 15px; border-top: 1px solid #edf2f7; font-size: 0.72rem; color: #a0aec0; text-align: center; }}
         </style>
     </head>
     <body>
         <div class="email-container">
             <div class="header">
-                <table width="100%" cellpadding="0" cellspacing="0">
-                    <tr>
-                        <td width="55" style="vertical-align: middle;">{logo_img_tag}</td>
-                        <td style="vertical-align: middle;">
-                            <h2 class="title">Warisan Security SOC</h2>
-                            <p class="subtitle">Deep LSTM Threat Intelligence & Incident Operations</p>
-                        </td>
-                    </tr>
-                </table>
+                <h2 class="title">Warisan Security Operations Center</h2>
+                <p class="subtitle">Deep LSTM Threat Intelligence & Incident Operations</p>
             </div>
-            
             <div class="alert-card">
                 <div class="alert-header">🚨 CRITICAL THREAT DETECTED</div>
                 <div class="alert-row">IP Address: &nbsp;<b>{target_ip}</b></div>
                 <div class="alert-row">Threat Type: &nbsp;<b>{threat_label}</b></div>
                 <div class="alert-row">Confidence: &nbsp;<b>{confidence_score:.1f}%</b></div>
-                <div class="alert-row" style="margin-top: 10px; font-size: 0.8rem; color: #cbd5e1;">Timestamp: {timestamp_str}</div>
+                <div class="alert-row" style="margin-top: 8px; font-size: 0.8rem; color: #718093;">Timestamp: {timestamp_str}</div>
             </div>
-
             <div class="description">
                 The Deep LSTM intrusion detection engine has identified high-confidence anomalous network behavior requiring immediate security review and SOAR isolation.
             </div>
-
             <div class="footer">
                 Warisan Security Operations Center (SOC) Automated Notification Service<br>
                 This is a secure automated alert. Please do not reply directly to this email.
@@ -322,8 +248,6 @@ def send_welcome_email(recipient_email, username):
     SENDER_PASSWORD = "zjmm vunm ngec wkvu"
     
     subject = "🛡️ [WARISAN SOC] Account Successfully Registered"
-    logo_b64 = get_base64_image("Logo.png")
-    logo_img_tag = f'<img src="{logo_b64}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b;" alt="Logo">' if logo_b64 else '<span style="font-size: 2rem;">🛡️</span>'
 
     html_body = f"""
     <!DOCTYPE html>
@@ -331,82 +255,22 @@ def send_welcome_email(recipient_email, username):
     <head>
         <meta charset="UTF-8">
         <style>
-            body {{
-                background-color: #0f172a;
-                color: #e2e8f0;
-                font-family: Arial, sans-serif;
-                margin: 0;
-                padding: 20px;
-            }}
-            .email-content {{
-                max-width: 580px;
-                margin: 0 auto;
-                background-color: #1e293b;
-                border-radius: 12px;
-                border: 1px solid #334155;
-                padding: 30px;
-            }}
-            .header {{
-                border-bottom: 1px solid #334155;
-                padding-bottom: 15px;
-                margin-bottom: 20px;
-            }}
-            .title {{
-                font-size: 1.2rem;
-                font-weight: bold;
-                color: #ffffff;
-                margin: 0;
-            }}
-            .subtitle {{
-                font-size: 0.75rem;
-                color: #94a3b8;
-                margin: 2px 0 0 0;
-            }}
-            .greeting {{
-                font-size: 1rem;
-                font-weight: bold;
-                color: #f8fafc;
-                margin-bottom: 12px;
-            }}
-            .badge {{
-                background-color: rgba(255, 75, 75, 0.2);
-                border: 1px solid rgba(255, 75, 75, 0.5);
-                color: #ff8080;
-                padding: 10px 14px;
-                border-radius: 6px;
-                font-size: 0.85rem;
-                font-weight: bold;
-                margin-bottom: 20px;
-                text-align: center;
-            }}
-            .message {{
-                font-size: 0.9rem;
-                color: #cbd5e1;
-                line-height: 1.5;
-                margin-bottom: 16px;
-            }}
-            .footer {{
-                margin-top: 25px;
-                padding-top: 15px;
-                border-top: 1px solid #334155;
-                font-size: 0.7rem;
-                color: #64748b;
-                text-align: center;
-            }}
+            body {{ background-color: #f4f6f9; color: #333333; font-family: Arial, sans-serif; margin: 0; padding: 20px; }}
+            .email-content {{ max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; border: 1px solid #dcdde1; padding: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }}
+            .header {{ border-bottom: 2px solid #3182ce; padding-bottom: 15px; margin-bottom: 20px; }}
+            .title {{ font-size: 1.2rem; font-weight: bold; color: #1e272e; margin: 0; }}
+            .subtitle {{ font-size: 0.75rem; color: #718093; margin: 2px 0 0 0; }}
+            .greeting {{ font-size: 1rem; font-weight: bold; color: #2d3748; margin-bottom: 12px; }}
+            .badge {{ background-color: #ebf8ff; border: 1px solid #bee3f8; color: #2b6cb0; padding: 10px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: bold; margin-bottom: 20px; text-align: center; }}
+            .message {{ font-size: 0.9rem; color: #4a5568; line-height: 1.5; margin-bottom: 16px; }}
+            .footer {{ margin-top: 25px; padding-top: 15px; border-top: 1px solid #edf2f7; font-size: 0.7rem; color: #a0aec0; text-align: center; }}
         </style>
     </head>
     <body>
         <div class="email-content">
             <div class="header">
-                <table width="100%" cellpadding="0" cellspacing="0">
-                    <tr>
-                        <td width="55" style="vertical-align: middle;">{logo_img_tag}</td>
-                        <td style="vertical-align: middle;">
-                            <h2 class="title">Warisan Security SOC</h2>
-                            <p class="subtitle">Malware Operations & AI Threat Analytics</p>
-                        </td>
-                    </tr>
-                </table>
+                <h2 class="title">Warisan Security SOC</h2>
+                <p class="subtitle">Malware Operations & AI Threat Analytics</p>
             </div>
             <div class="greeting">Hello {username},</div>
             <div class="badge">✓ Account Successfully Registered</div>
@@ -602,10 +466,13 @@ if not st.session_state["logged_in"]:
                         if reg_pass == reg_confirm_pass:
                             success = register_user(reg_user, reg_email, reg_pass, "user")
                             if success:
-                                with st.spinner("Sending styled confirmation email..."):
-                                    send_welcome_email(reg_email, reg_user)
+                                with st.spinner("Sending confirmation email..."):
+                                    email_sent = send_welcome_email(reg_email, reg_user)
                                 
-                                st.success("Account successfully registered & confirmation email sent! Redirecting to Sign In...")
+                                if email_sent:
+                                    st.success("Account successfully registered & confirmation email sent! Redirecting...")
+                                else:
+                                    st.warning("Account registered in database, but confirmation email failed to send (check SMTP/firewall). Redirecting...")
                                 time.sleep(1.5)
                                 st.session_state["auth_view"] = "Login"
                                 st.rerun()
@@ -704,12 +571,10 @@ if not st.session_state["logged_in"]:
 if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
     st.session_state.role = "admin"
 
-# Determine user role for conditional sidebar rendering
 user_role = st.session_state.get('role', 'user').strip().lower()
 if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
     user_role = "admin"
 
-# Clean header layout
 if logo_base64:
     st.markdown(f"""
         <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 20px;">
@@ -729,7 +594,7 @@ def load_detection_engine():
     return True
 
 if load_detection_engine():
-    st.success("✅ Successfully connected to backend threat engine, Deep LSTM model, and SOAR framework.")
+    st.success("✅ Successfully connected to backend threat engine, LSTM model, and SOAR framework.")
 
 @st.cache_data
 def get_backend_predictions():
@@ -818,12 +683,14 @@ def generate_pdf_report(dataframe):
     ]
 
     try:
-        pil_img = Image.open("Logo.png")
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        logo_path = os.path.join(base_path, "Logo.png")
+        pil_img = Image.open(logo_path)
         orig_w, orig_h = pil_img.size
         target_w = 40
         target_h = max(15, int(target_w * (orig_h / orig_w)))
 
-        logo_img = RLImage("Logo.png", width=target_w, height=target_h)
+        logo_img = RLImage(logo_path, width=target_w, height=target_h)
         header_table = Table([[logo_img, header_text_elements]], colWidths=[50, 485])
         header_table.setStyle(
             TableStyle([
@@ -891,7 +758,8 @@ def generate_pdf_report(dataframe):
     doc.build(elements)
     buffer.seek(0)
     
-    with open("executive_threat_report.pdf", "wb") as f_out:
+    pdf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "executive_threat_report.pdf")
+    with open(pdf_path, "wb") as f_out:
         f_out.write(buffer.getvalue())
     buffer.seek(0)
     
@@ -903,7 +771,6 @@ def generate_pdf_report(dataframe):
 if logo_base64:
     st.sidebar.markdown(f'<div style="text-align: center; margin-bottom: 12px;"><img src="{logo_base64}" style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 0 12px rgba(255,75,75,0.6);"></div>', unsafe_allow_html=True)
 
-# --- USER PROFILE & REFRESH BUTTONS IN LEFT SIDEBAR ---
 with st.sidebar.expander("👤 User Profile & Session", expanded=True):
     st.markdown(f"""
         <div style="background-color: #0d2318; border: 1px solid #1e4630; border-radius: 8px; padding: 10px; margin-bottom: 10px;">
@@ -951,7 +818,6 @@ with st.sidebar.expander("🎛️ Filter & Analysis Controls", expanded=True):
     )
     filtered_df = df[df["Threat"].isin(selected_threats)] if not df.empty else df
 
-# --- LIVE STREAM TELEMETRY & SOAR ---
 with st.sidebar.expander("📡 Live Stream Telemetry", expanded=False):
     stream_live = st.toggle("Enable Live Packet Feed", value=False)
     if stream_live:
@@ -970,7 +836,6 @@ with st.sidebar.expander("🛡️ Incident Response (SOAR)", expanded=False):
         handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated (User: {st.session_state['username']}).", is_critical=True)
         st.success(f"Successfully isolated host {target_ip}!")
 
-# --- ADMIN-ONLY OPERATIONS & REPORTS SECTION ---
 if user_role == 'admin':
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🛠️ Operations & Reports")
@@ -997,7 +862,8 @@ if user_role == 'admin':
                         body = "Attached is the latest automated executive threat intelligence report generated by Warisan Security Malware Operations."
                         msg.attach(MIMEText(body, 'plain'))
                         
-                        with open(pdf_filename, "rb") as f:
+                        pdf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), pdf_filename)
+                        with open(pdf_path, "rb") as f:
                             attach = MIMEApplication(f.read(), Name=pdf_filename)
                             attach['Content-Disposition'] = f'attachment; filename="{pdf_filename}"'
                             msg.attach(attach)
@@ -1044,7 +910,6 @@ m4.metric("Highest Threat", "Botnet & DDoS Activity")
 
 st.divider()
 
-# --- CHARTS & VISUALS ---
 col_chart1, col_chart2 = st.columns(2)
 
 with col_chart1:
@@ -1093,7 +958,6 @@ with col_chart2:
 
 st.divider()
 
-# --- MODEL EXPLAINABILITY (XAI) ---
 st.subheader("🧠 Model Explainability & XAI (Explainable AI)")
 st.caption("Gradient-based feature attribution displaying which packet attributes drove the LSTM threat classification.")
 
@@ -1130,7 +994,6 @@ with col_xai2:
 
 st.divider()
 
-# --- THREAT INTELLIGENCE ---
 st.subheader("🌐 External Threat Intelligence & VirusTotal Lookup")
 
 vt_ip_options = filtered_df["IP"].unique() if not filtered_df.empty else ["192.168.1.34"]
@@ -1171,7 +1034,6 @@ with st.expander(f"🔍 View VirusTotal / AbuseIPDB Reputation Report ({selected
 
 st.divider()
 
-# --- EVENT LOG TABLE ---
 st.subheader("🔍 Real-Time Threat Event Log")
 
 display_df = filtered_df.copy()
@@ -1194,7 +1056,6 @@ st.dataframe(
     },
 )
 
-# --- DEEP LSTM DIAGNOSTICS & LOGS ---
 with st.expander("🔬 Show Deep LSTM Layer Diagnostics & Neural Network Logs"):
     st.code(
         """
@@ -1211,9 +1072,6 @@ with st.expander("🔬 Show Deep LSTM Layer Diagnostics & Neural Network Logs"):
 
 st.divider()
 
-# ==========================================
-# AUTOMATED DEEP LSTM THREAT CHECK & TRIGGER
-# ==========================================
 if "last_alerted_threat" not in st.session_state:
     st.session_state.last_alerted_threat = None
 
@@ -1235,7 +1093,6 @@ else:
 
 st.divider()
 
-# --- FOOTER ---
 st.markdown("""
     <div style="text-align: center; margin-top: 40px; padding: 20px 0; border-top: 1px solid #1f2937; color: #64748b; font-size: 0.85rem;">
         Warisan Security Operations Center (SOC) • Enterprise Threat Intelligence & Automated SOAR Framework
