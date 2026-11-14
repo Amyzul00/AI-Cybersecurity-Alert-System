@@ -1104,12 +1104,12 @@ with st.expander("🔬 Show Deep LSTM Layer Diagnostics & Neural Network Logs"):
 
 st.divider()
 
-# --- MOVED REGISTERED USER ACCOUNTS & LOGIN STATISTICS TABLE HERE ---
-st.subheader("👥 Registered User Accounts & Login Statistics")
-users_df = get_all_user_accounts()
-st.dataframe(users_df, use_container_width=True)
-
-st.divider()
+# --- ADMIN-ONLY REGISTERED USER ACCOUNTS & LOGIN STATISTICS TABLE ---
+if user_role == 'admin':
+    st.subheader("👥 Registered User Accounts & Login Statistics")
+    users_df = get_all_user_accounts()
+    st.dataframe(users_df, use_container_width=True)
+    st.divider()
 
 if "last_alerted_threat" not in st.session_state:
     st.session_state.last_alerted_threat = None
