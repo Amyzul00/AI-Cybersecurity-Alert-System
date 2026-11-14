@@ -87,7 +87,6 @@ st.markdown('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs
 
 # --- HIDE TOP-RIGHT TOOLBAR BUTTONS & CONDITIONAL TOP PROGRESS BAR ---
 if not st.session_state["logged_in"]:
-    # Hide top progress bar and toolbar items on Login/Register view
     st.markdown("""
         <style>
         [data-testid="stToolbar"] > div:not(:last-child) {
@@ -103,7 +102,6 @@ if not st.session_state["logged_in"]:
         </style>
     """, unsafe_allow_html=True)
 else:
-    # Hide only toolbar buttons on Dashboard, keep progress bar visible
     st.markdown("""
         <style>
         [data-testid="stToolbar"] > div:not(:last-child) {
@@ -189,48 +187,59 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=95.8, target_ip="
     SENDER_PASSWORD = "zjmm vunm ngec wkvu"
 
     subject = f"🚨 [WARISAN SOC] CRITICAL THREAT DETECTED: {threat_label}"
+    timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
 
+    # Clean White Container Layout (Picture 1 style) containing the Two Threat Cards (Picture 2 data)
     html_body = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="UTF-8">
+        <style>
+            body {{ background-color: #f4f6f9; color: #333333; font-family: Arial, sans-serif; margin: 0; padding: 20px; }}
+            .email-container {{ max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; border: 1px solid #dcdde1; padding: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }}
+            .header {{ border-bottom: 2px solid #ff4b4b; padding-bottom: 15px; margin-bottom: 20px; }}
+            .title {{ font-size: 1.25rem; font-weight: bold; color: #1e272e; margin: 0; }}
+            .subtitle {{ font-size: 0.8rem; color: #718093; margin: 4px 0 0 0; }}
+            .alert-card {{ background-color: #fff5f5; border: 1px solid #feb2b2; border-left: 5px solid #e53e3e; border-radius: 6px; padding: 16px; margin-bottom: 16px; }}
+            .alert-header {{ color: #c53030; font-size: 0.95rem; font-weight: bold; margin-bottom: 10px; }}
+            .alert-row {{ font-size: 0.92rem; color: #2d3748; margin-bottom: 6px; }}
+            .description {{ font-size: 0.88rem; color: #4a5568; line-height: 1.5; margin-bottom: 20px; }}
+            .footer {{ margin-top: 25px; padding-top: 15px; border-top: 1px solid #edf2f7; font-size: 0.72rem; color: #a0aec0; text-align: center; }}
+        </style>
     </head>
-    <body style="background-color: #161412; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 24px;">
-        <div style="max-width: 480px; margin: 0 auto;">
+    <body>
+        <div class="email-container">
+            <div class="header">
+                <h2 class="title">Warisan Security Operations Center</h2>
+                <p class="subtitle">Deep LSTM Threat Intelligence & Incident Operations</p>
+            </div>
             
             <!-- Alert Card 1 -->
-            <div style="background-color: #2c1816; border: 1px solid #6b2926; border-radius: 10px; padding: 20px 24px; margin-bottom: 16px;">
-                <div style="color: #e06c65; font-size: 16px; font-weight: 700; margin-bottom: 14px; letter-spacing: 0.3px;">
-                    🚨 CRITICAL THREAT DETECTED
-                </div>
-                <div style="color: #e6e1dc; font-size: 16px; margin-bottom: 10px;">
-                    IP: <strong style="color: #ffffff;">{target_ip}</strong>
-                </div>
-                <div style="color: #e6e1dc; font-size: 16px; margin-bottom: 10px;">
-                    Type: <strong style="color: #ffffff;">{threat_label}</strong>
-                </div>
-                <div style="color: #e6e1dc; font-size: 16px; margin-bottom: 0;">
-                    Confidence: <strong style="color: #ffffff;">{confidence_score:.1f}%</strong>
-                </div>
+            <div class="alert-card">
+                <div class="alert-header">🚨 CRITICAL THREAT DETECTED</div>
+                <div class="alert-row">IP Address: &nbsp;<b>{target_ip}</b></div>
+                <div class="alert-row">Threat Type: &nbsp;<b>{threat_label}</b></div>
+                <div class="alert-row">Confidence: &nbsp;<b>{confidence_score:.1f}%</b></div>
+                <div class="alert-row" style="margin-top: 8px; font-size: 0.8rem; color: #718093;">Timestamp: {timestamp_str}</div>
             </div>
 
             <!-- Alert Card 2 -->
-            <div style="background-color: #2c1816; border: 1px solid #6b2926; border-radius: 10px; padding: 20px 24px;">
-                <div style="color: #e06c65; font-size: 16px; font-weight: 700; margin-bottom: 14px; letter-spacing: 0.3px;">
-                    🚨 CRITICAL THREAT DETECTED
-                </div>
-                <div style="color: #e6e1dc; font-size: 16px; margin-bottom: 10px;">
-                    IP: <strong style="color: #ffffff;">192.168.1.210</strong>
-                </div>
-                <div style="color: #e6e1dc; font-size: 16px; margin-bottom: 10px;">
-                    Type: <strong style="color: #ffffff;">DDoS</strong>
-                </div>
-                <div style="color: #e6e1dc; font-size: 16px; margin-bottom: 0;">
-                    Confidence: <strong style="color: #ffffff;">96.0%</strong>
-                </div>
+            <div class="alert-card">
+                <div class="alert-header">🚨 CRITICAL THREAT DETECTED</div>
+                <div class="alert-row">IP Address: &nbsp;<b>192.168.1.210</b></div>
+                <div class="alert-row">Threat Type: &nbsp;<b>DDoS</b></div>
+                <div class="alert-row">Confidence: &nbsp;<b>96.0%</b></div>
+                <div class="alert-row" style="margin-top: 8px; font-size: 0.8rem; color: #718093;">Timestamp: {timestamp_str}</div>
             </div>
 
+            <div class="description">
+                The Deep LSTM intrusion detection engine has identified high-confidence anomalous network behavior requiring immediate security review and SOAR isolation.
+            </div>
+            <div class="footer">
+                Warisan Security Operations Center (SOC) Automated Notification Service<br>
+                This is a secure automated alert. Please do not reply directly to this email.
+            </div>
         </div>
     </body>
     </html>
