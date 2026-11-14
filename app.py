@@ -44,27 +44,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# --- PERMANENTLY FORCE SIDEBAR OPEN & LOCKED ---
-st.markdown("""
-    <style>
-    /* Force sidebar container to remain visible, pinned open, and expanded */
-    section[data-testid="stSidebar"] {
-        display: block !important;
-        visibility: visible !important;
-        transform: translateX(0px) !important;
-        width: 300px !important;
-        min-width: 300px !important;
-    }
-    /* Hide the collapse/expand toggle button entirely so it cannot be clicked */
-    button[data-testid="baseButton-header"],
-    button[kind="header"],
-    [data-testid="collapsedControl"] {
-        display: none !important;
-        pointer-events: none !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
 # --- GLOBAL SESSION STATE INITIALIZATION ---
 if "user_email" not in st.session_state:
     st.session_state["user_email"] = None
