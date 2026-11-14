@@ -5,6 +5,8 @@ from database import (
     fetch_recent_threats,
     register_user,
     get_all_registered_users,
+    increment_user_login,
+    get_all_user_accounts,
     update_user_password,
 )
 import threat_detector
@@ -417,6 +419,9 @@ if not st.session_state["logged_in"]:
                         
                         if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
                             st.session_state.role = "admin"
+                        
+                        # Increment Login Count in DB
+                        increment_user_login(st.session_state["temp_email"])
                         
                         st.session_state["otp_required"] = False
                         st.session_state["generated_otp"] = ""
@@ -867,6 +872,12 @@ with st.sidebar.expander("🛡️ Incident Response (SOAR)", expanded=False):
 if user_role == 'admin':
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🛠️ Operations & Reports")
+
+    if st.sidebar.button("📊 View Registered Users & Logins", use_container_width=True):
+        st.subheader("👥 Registered User Accounts & Login Statistics")
+        users_df = get_all_user_accounts()
+        st.dataframe(users_df, use_container_width=True)
+        st.divider()
 
     if st.sidebar.button("📧 Email PDF Report to All Users", use_container_width=True):
         try:
