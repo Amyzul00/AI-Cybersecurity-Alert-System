@@ -4,3 +4,7 @@ plotly
 pillow
 reportlab
 pymysql
+joblib
+torch
+scapy
+scikit-learn
