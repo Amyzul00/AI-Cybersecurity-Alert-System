@@ -189,7 +189,6 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=95.8, target_ip="
     subject = f"🚨 [WARISAN SOC] CRITICAL THREAT DETECTED: {threat_label}"
     timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
 
-    # Clean White Container Layout (Picture 1 style) containing the Two Threat Cards (Picture 2 data)
     html_body = f"""
     <!DOCTYPE html>
     <html>
