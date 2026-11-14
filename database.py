@@ -14,7 +14,7 @@ def get_db_connection():
 
 
 def init_db():
-    """Initialize threat logs and user tables with robust schema validation and default seeding."""
+    """Initialize threat logs and user tables with robust schema validation, column migration, and default seeding."""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -44,6 +44,14 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+
+        # --- AUTO-MIGRATE MISSING COLUMNS FOR EXISTING DEPLOYMENTS ---
+        cursor.execute("PRAGMA table_info(users)")
+        columns = [col[1] for col in cursor.fetchall()]
+        if "login_count" not in columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN login_count INTEGER DEFAULT 0")
+        if "last_login" not in columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN last_login TEXT")
 
         # --- SEED DEFAULT USERS (PREVENTS ACCOUNT LOSS ON RESTART) ---
         default_users = [
