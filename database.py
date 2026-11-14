@@ -1,6 +1,7 @@
 import sqlite3
 import datetime
 import os
+import pandas as pd
 
 DB_NAME = 'threat_logs.db'
 
@@ -38,6 +39,8 @@ def init_db():
                 email TEXT NOT NULL UNIQUE,
                 role TEXT NOT NULL DEFAULT 'user',
                 password TEXT NOT NULL DEFAULT '',
+                login_count INTEGER DEFAULT 0,
+                last_login TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -52,7 +55,7 @@ def init_db():
             cursor.execute("SELECT id FROM users WHERE email = ?", (uemail,))
             if not cursor.fetchone():
                 cursor.execute(
-                    "INSERT INTO users (username, email, role, password) VALUES (?, ?, ?, ?)",
+                    "INSERT INTO users (username, email, role, password, login_count) VALUES (?, ?, ?, ?, 0)",
                     (uname, uemail, urole, upass)
                 )
 
@@ -115,7 +118,7 @@ def register_user(username: str, email: str, password: str, role: str = "user") 
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO users (username, email, role, password) VALUES (?, ?, ?, ?)",
+            "INSERT INTO users (username, email, role, password, login_count) VALUES (?, ?, ?, ?, 0)",
             (username.strip(), email.strip().lower(), role, password)
         )
         conn.commit()
@@ -135,6 +138,40 @@ def get_all_registered_users():
         cursor.execute("SELECT email FROM users WHERE email IS NOT NULL AND email != ''")
         rows = cursor.fetchall()
         return [row['email'].strip() for row in rows if row['email'] and "@" in str(row['email'])]
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def increment_user_login(email: str):
+    """Increment user login count and record current timestamp upon successful authentication."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute(
+            "UPDATE users SET login_count = login_count + 1, last_login = ? WHERE email = ?",
+            (current_time, email.strip().lower())
+        )
+        conn.commit()
+    except Exception as e:
+        print(f"[-] Failed to update login count: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def get_all_user_accounts():
+    """Fetch a DataFrame of all registered user accounts, roles, login counts, and timestamps for admin audits."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT username, email, role, login_count, last_login FROM users")
+        rows = cursor.fetchall()
+        return pd.DataFrame(rows, columns=["Username", "Email", "Role", "Login Count", "Last Login"])
+    except Exception as e:
+        print(f"[-] Failed to fetch user accounts: {e}")
+        return pd.DataFrame(columns=["Username", "Email", "Role", "Login Count", "Last Login"])
     finally:
         cursor.close()
         conn.close()
