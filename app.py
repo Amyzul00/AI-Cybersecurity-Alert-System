@@ -85,14 +85,32 @@ if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
 # --- FONT AWESOME CDN FOR SIDEBAR ICONS ---
 st.markdown('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">', unsafe_allow_html=True)
 
-# --- HIDE TOP-RIGHT TOOLBAR BUTTONS (KEEPING THREE-DOT MENU) ---
-st.markdown("""
-    <style>
-    [data-testid="stToolbar"] > div:not(:last-child) {
-        display: none !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# --- HIDE TOP-RIGHT TOOLBAR BUTTONS & CONDITIONAL TOP PROGRESS BAR ---
+if not st.session_state["logged_in"]:
+    # Hide top progress bar and toolbar items on Login/Register view
+    st.markdown("""
+        <style>
+        [data-testid="stToolbar"] > div:not(:last-child) {
+            display: none !important;
+        }
+        header {
+            visibility: hidden !important;
+            height: 0px !important;
+        }
+        .stProgress {
+            display: none !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+else:
+    # Hide only toolbar buttons on Dashboard, keep progress bar visible
+    st.markdown("""
+        <style>
+        [data-testid="stToolbar"] > div:not(:last-child) {
+            display: none !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
 # --- ELITE SOC AUTH & GLOBAL STYLING ---
 st.markdown("""
