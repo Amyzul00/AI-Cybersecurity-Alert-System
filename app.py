@@ -44,13 +44,17 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# --- FORCE SIDEBAR TO STAY OPEN & EXPANDED ---
+# --- FORCE SIDEBAR TO STAY OPEN & EXPANDED (CSS OVERRIDE) ---
 st.markdown("""
     <style>
     section[data-testid="stSidebar"] {
         display: block !important;
         visibility: visible !important;
         transform: translateX(0px) !important;
+        width: 300px !important;
+    }
+    button[kind="header"] {
+        display: none !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -329,9 +333,6 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=98.45, target_ip=
         pass
 
     return sent_count
-
-def send_security_alert_to_all(src_ip, threat_type):
-    return auto_send_lstm_threat_alert(threat_type)
 
 def send_welcome_email(recipient_email, username):
     SENDER_EMAIL = "warisansecurityalerts@gmail.com"
@@ -1248,7 +1249,7 @@ if predicted_class.lower() != "normal":
             else:
                 st.warning("Threat detected, but no valid user emails were found in the database.")
 else:
-    st.session_state.last_alerted_threat = None
+    st.session_state.last_alertged_threat = None
 
 st.divider()
 
