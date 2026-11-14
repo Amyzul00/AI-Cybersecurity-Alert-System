@@ -169,7 +169,7 @@ def verify_password(plain_password, stored_password):
 # ==========================================
 # AUTOMATED EMAIL & ALERT FUNCTIONS
 # ==========================================
-def auto_send_lstm_threat_alert(threat_label, confidence_score=None):
+def auto_send_lstm_threat_alert(threat_label, confidence_score=98.45, target_ip="192.168.1.96"):
     recipient_emails = get_all_registered_users()
     recipient_emails = list(set([e.lower().strip() for e in recipient_emails if e and "@" in e]))
     
@@ -179,19 +179,120 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=None):
     SENDER_EMAIL = "warisansecurityalerts@gmail.com"
     SENDER_PASSWORD = "zjmm vunm ngec wkvu"
 
-    subject = f"🚨 [WARISAN SOC] SECURITY ALERT: {threat_label} Detected!"
-    conf_text = f"\nModel Confidence: {confidence_score:.2f}%" if confidence_score else ""
-    
-    body = f"""
-    WARNING: The Warisan Security Malware Operations Deep LSTM Intrusion Detection System has detected a critical network threat.
+    subject = f"🚨 [WARISAN SOC] CRITICAL THREAT DETECTED: {threat_label}"
+    timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+    logo_b64 = get_base64_image("Logo.png")
+    logo_img_tag = f'<img src="{logo_b64}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b;" alt="Logo">' if logo_b64 else '<span style="font-size: 2rem;">🚨</span>'
 
-    Threat Classification: {threat_label}{conf_text}
-    Timestamp: {datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")}
+    html_body = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            body {{
+                background-color: #0b0f17;
+                color: #e2e8f0;
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 20px;
+            }}
+            .email-container {{
+                max-width: 580px;
+                margin: 0 auto;
+                background-color: #121824;
+                border-radius: 14px;
+                border: 1px solid #1f2937;
+                padding: 30px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            }}
+            .header {{
+                border-bottom: 1px solid #1f2937;
+                padding-bottom: 15px;
+                margin-bottom: 22px;
+            }}
+            .title {{
+                font-size: 1.25rem;
+                font-weight: bold;
+                color: #ffffff;
+                margin: 0;
+            }}
+            .subtitle {{
+                font-size: 0.78rem;
+                color: #94a3b8;
+                margin: 3px 0 0 0;
+            }}
+            .alert-card {{
+                background-color: #1e1517;
+                border: 1px solid rgba(255, 75, 75, 0.4);
+                border-radius: 10px;
+                padding: 20px;
+                margin-bottom: 22px;
+            }}
+            .alert-header {{
+                color: #ff8080;
+                font-size: 0.95rem;
+                font-weight: bold;
+                letter-spacing: 0.5px;
+                margin-bottom: 12px;
+            }}
+            .alert-row {{
+                font-size: 0.92rem;
+                color: #f8fafc;
+                margin-bottom: 8px;
+            }}
+            .alert-row b {{
+                color: #ffffff;
+            }}
+            .description {{
+                font-size: 0.88rem;
+                color: #94a3b8;
+                line-height: 1.5;
+                margin-bottom: 20px;
+            }}
+            .footer {{
+                margin-top: 25px;
+                padding-top: 15px;
+                border-top: 1px solid #1f2937;
+                font-size: 0.72rem;
+                color: #64748b;
+                text-align: center;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="email-container">
+            <div class="header">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td width="55" style="vertical-align: middle;">{logo_img_tag}</td>
+                        <td style="vertical-align: middle;">
+                            <h2 class="title">Warisan Security SOC</h2>
+                            <p class="subtitle">Deep LSTM Threat Intelligence & Incident Operations</p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div class="alert-card">
+                <div class="alert-header">🚨 CRITICAL THREAT DETECTED</div>
+                <div class="alert-row">IP Address: &nbsp;<b>{target_ip}</b></div>
+                <div class="alert-row">Threat Type: &nbsp;<b>{threat_label}</b></div>
+                <div class="alert-row">Confidence: &nbsp;<b>{confidence_score:.1f}%</b></div>
+                <div class="alert-row" style="margin-top: 10px; font-size: 0.8rem; color: #cbd5e1;">Timestamp: {timestamp_str}</div>
+            </div>
 
-    Please log in to the security dashboard immediately to review incident logs, examine XAI feature attribution, and execute SOAR firewall isolation.
+            <div class="description">
+                The Deep LSTM intrusion detection engine has identified high-confidence anomalous network behavior requiring immediate security review and SOAR isolation.
+            </div>
 
-    --
-    Warisan Security Operations Center (SOC) Automated Notification Service
+            <div class="footer">
+                Warisan Security Operations Center (SOC) Automated Notification Service<br>
+                This is a secure automated alert. Please do not reply directly to this email.
+            </div>
+        </div>
+    </body>
+    </html>
     """
 
     sent_count = 0
@@ -202,11 +303,11 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=None):
 
         for email in recipient_emails:
             try:
-                msg = MIMEMultipart()
+                msg = MIMEMultipart("alternative")
                 msg["From"] = SENDER_EMAIL
                 msg["To"] = email
                 msg["Subject"] = subject
-                msg.attach(MIMEText(body, "plain"))
+                msg.attach(MIMEText(html_body, "html"))
 
                 server.sendmail(SENDER_EMAIL, email, msg.as_string())
                 sent_count += 1
@@ -498,7 +599,7 @@ if not st.session_state["logged_in"]:
                 reg_user = st.text_input("Choose Username", key="reg_username")
                 reg_email = st.text_input("Email Address (For Notifications & OTP)", key="reg_email")
                 reg_pass = st.text_input("Choose Password", type="password", key="reg_password")
-                reg_confirm_pass = st.text_input("Confirm Password", type="password", key="reg_confirm_password")
+                reg_confirm_pass = st.text_input("Confirm Password", type="password", key="reg_confirm_pass")
                 
                 st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
                 if st.button("Register Account", use_container_width=True, type="primary"):
@@ -937,7 +1038,7 @@ if user_role == 'admin':
         use_container_width=True,
     )
 else:
-    st.sidebar.caption("🔒 *Live Telemetry, SOAR response, report broadcasts & downloads are restricted to Administrator accounts.*")
+    st.sidebar.caption("🔒 *Report broadcasts and file downloads are restricted to Administrator accounts.*")
 
 # --- METRICS ROW ---
 m1, m2, m3, m4 = st.columns(4)
