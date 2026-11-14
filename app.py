@@ -43,7 +43,7 @@ init_db()
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
-    page_title="Warisan Security Malware Operations - AI Threat Detection",
+    page_title="Warisan AI-Based Threat Detection & Real-time Alert System",
     page_icon="Logo.png",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -242,7 +242,7 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=95.8, target_ip="
     <body>
         <div class="email-container">
             <div class="header">
-                <h2 class="title">Warisan Security Operations Center</h2>
+                <h2 class="title">Warisan AI-Based Threat Detection & Real-time Alert System</h2>
                 <p class="subtitle">Deep LSTM Threat Intelligence & Incident Operations</p>
             </div>
             
@@ -268,7 +268,7 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=95.8, target_ip="
                 The Deep LSTM intrusion detection engine has identified high-confidence anomalous network behavior requiring immediate security review and SOAR isolation.
             </div>
             <div class="footer">
-                Warisan Security Operations Center (SOC) Automated Notification Service<br>
+                Warisan AI-Based Threat Detection & Real-time Alert System Automated Notification Service<br>
                 This is a secure automated alert. Please do not reply directly to this email.
             </div>
         </div>
@@ -329,19 +329,19 @@ def send_welcome_email(recipient_email, username):
     <body>
         <div class="email-content">
             <div class="header">
-                <h2 class="title">Warisan Security SOC</h2>
-                <p class="subtitle">Malware Operations & AI Threat Analytics</p>
+                <h2 class="title">Warisan AI-Based Threat Detection & Real-time Alert System</h2>
+                <p class="subtitle">AI Threat Analytics & Incident Operations</p>
             </div>
             <div class="greeting">Hello {username},</div>
             <div class="badge">✓ Account Successfully Registered</div>
             <div class="message">
-                Your account for the Warisan Security Malware Operations SOC Portal has been successfully created and secured with 2FA privileges.
+                Your account for the Warisan AI-Based Threat Detection & Real-time Alert System Portal has been successfully created and secured with 2FA privileges.
             </div>
             <div class="message">
                 You can now log in using your credentials to access real-time AI threat detection dashboards, Deep LSTM analytics, and automated SOAR incident response tools.
             </div>
             <div class="footer">
-                Warisan Security Operations Center (SOC) Automated Notification Service<br>
+                Warisan AI-Based Threat Detection & Real-time Alert System Automated Notification Service<br>
                 This is a secure automated notification. Please do not reply directly to this email.
             </div>
         </div>
@@ -375,14 +375,14 @@ def send_password_reset_email(recipient_email, reset_code):
     body = f"""
     Hello,
 
-    We received a request to reset your password for the Warisan Security Malware Operations SOC Portal.
+    We received a request to reset your password for the Warisan AI-Based Threat Detection & Real-time Alert System Portal.
     
     Your Password Reset Verification Code is: {reset_code}
 
     If you did not request this password reset, please ignore this email or contact the administrator.
 
     --
-    Warisan Security Operations Center (SOC) Automated Service
+    Warisan AI-Based Threat Detection & Real-time Alert System Automated Service
     """
     try:
         server = smtplib.SMTP("smtp.gmail.com", 587)
@@ -416,8 +416,8 @@ if not st.session_state["logged_in"]:
         st.markdown(f"""
             <div style="text-align: center; margin-bottom: 20px;">
                 {logo_html}
-                <h2 style="color: #ffffff; margin: 0; font-size: 1.6rem; font-weight: 700; letter-spacing: -0.5px;">Warisan Security SOC</h2>
-                <p style="color: #94a3b8; font-size: 0.9rem; margin-top: 4px;">Malware Operations & AI Threat Analytics</p>
+                <h2 style="color: #ffffff; margin: 0; font-size: 1.4rem; font-weight: 700; letter-spacing: -0.5px; line-height: 1.3;">Warisan AI-Based Threat Detection & Real-time Alert System</h2>
+                <p style="color: #94a3b8; font-size: 0.85rem; margin-top: 6px;">AI-Based Threat Detection & Real-time Alert System</p>
             </div>
         """, unsafe_allow_html=True)
 
@@ -620,7 +620,7 @@ if not st.session_state["logged_in"]:
 
         st.markdown(f"""
             <div style="text-align: center; margin-top: 24px; font-size: 0.78rem; color: #64748b;">
-                {footer_logo_html} Warisan Security Operations Center — Secure 2FA Environment
+                {footer_logo_html} Warisan AI-Based Threat Detection & Real-time Alert System — Secure 2FA Environment
             </div>
         """, unsafe_allow_html=True)
 
@@ -642,14 +642,14 @@ if logo_base64:
         <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 20px;">
             <img src="{logo_base64}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 10px rgba(0,0,0,0.5);" alt="Logo">
             <div>
-                <h1 style="margin: 0; font-size: 2.2rem; color: #ffffff;">Warisan Security Malware Operations</h1>
-                <p style="margin: 5px 0 0 0; color: #8a99ad; font-size: 1rem;">🔒 Dynamic Threat Detection, Automated Incident Analytics & SOAR</p>
+                <h1 style="margin: 0; font-size: 2.0rem; color: #ffffff; line-height: 1.2;">Warisan AI-Based Threat Detection & Real-time Alert System</h1>
+                <p style="margin: 5px 0 0 0; color: #8a99ad; font-size: 1rem;">AI-Based Threat Detection & Real-time Alert System</p>
             </div>
         </div>
     """, unsafe_allow_html=True)
 else:
-    st.title("Warisan Security Malware Operations")
-    st.caption("🔒 Dynamic Threat Detection, Automated Incident Analytics & SOAR")
+    st.title("Warisan AI-Based Threat Detection & Real-time Alert System")
+    st.caption("AI-Based Threat Detection & Real-time Alert System")
 
 @st.cache_resource
 def load_detection_engine():
@@ -725,7 +725,7 @@ def generate_pdf_report(dataframe):
     title_style = ParagraphStyle(
         "ReportTitle",
         parent=styles["Heading1"],
-        fontSize=16,
+        fontSize=14,
         textColor=colors.HexColor("#ff4b4b"),
         spaceAfter=2,
     )
@@ -740,8 +740,8 @@ def generate_pdf_report(dataframe):
 
     current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
     header_text_elements = [
-        Paragraph("Warisan Security Malware Operations Executive Report", title_style),
-        Paragraph(f"Generated by Warisan Security Malware Operations | Timestamp: {current_timestamp}", subtitle_style),
+        Paragraph("Warisan AI-Based Threat Detection & Real-time Alert System Executive Report", title_style),
+        Paragraph(f"Generated by Warisan AI-Based Threat Detection & Real-time Alert System | Timestamp: {current_timestamp}", subtitle_style),
     ]
 
     try:
@@ -764,8 +764,8 @@ def generate_pdf_report(dataframe):
         )
         elements.append(header_table)
     except Exception:
-        elements.append(Paragraph("Warisan Security Malware Operations Executive Report", title_style))
-        elements.append(Paragraph(f"Generated by Warisan Security Malware Operations | Timestamp: {current_timestamp}", subtitle_style))
+        elements.append(Paragraph("Warisan AI-Based Threat Detection & Real-time Alert System Executive Report", title_style))
+        elements.append(Paragraph(f"Generated by Warisan AI-Based Threat Detection & Real-time Alert System | Timestamp: {current_timestamp}", subtitle_style))
 
     elements.append(Spacer(1, 15))
 
@@ -919,9 +919,9 @@ if user_role == 'admin':
                         msg = MIMEMultipart()
                         msg['From'] = sender_email
                         msg['To'] = recipient
-                        msg['Subject'] = "[WARISAN SOC] Executive AI Threat & Malware Operations Report"
+                        msg['Subject'] = "[WARISAN SOC] Executive AI Threat Detection & Real-time Alert Report"
                         
-                        body = "Attached is the latest automated executive threat intelligence report generated by Warisan Security Malware Operations."
+                        body = "Attached is the latest automated executive threat intelligence report generated by Warisan AI-Based Threat Detection & Real-time Alert System."
                         msg.attach(MIMEText(body, 'plain'))
                         
                         pdf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), pdf_filename)
@@ -949,7 +949,7 @@ if user_role == 'admin':
     st.sidebar.download_button(
         label="📥 Download CSV",
         data=csv_data,
-        file_name="warisan_security_malware_operations_report.csv",
+        file_name="warisan_threat_detection_report.csv",
         mime="text/csv",
         use_container_width=True,
     )
@@ -1134,7 +1134,7 @@ with st.expander("🔬 Show Deep LSTM Layer Diagnostics & Neural Network Logs"):
 
 st.divider()
 
-# --- ADMIN-ONLY REGISTERED USER ACCOUNTS & LOGIN STATISTICS TABLE (RBAC) ---
+# --- ADMIN-ONLY REGISTERED USER ACCOUNTS & LOGIN STATISTICS TABLE ---
 if user_role == 'admin':
     st.subheader("👥 Registered User Accounts & Login Statistics")
     users_df = get_all_user_accounts()
@@ -1164,6 +1164,6 @@ st.divider()
 
 st.markdown("""
     <div style="text-align: center; margin-top: 40px; padding: 20px 0; border-top: 1px solid #1f2937; color: #64748b; font-size: 0.85rem;">
-        Warisan Security Operations Center (SOC) • Enterprise Threat Intelligence & Automated SOAR Framework
+        Warisan AI-Based Threat Detection & Real-time Alert System • Enterprise Threat Intelligence & Automated SOAR Framework
     </div>
 """, unsafe_allow_html=True)
