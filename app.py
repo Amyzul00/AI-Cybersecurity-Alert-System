@@ -17,6 +17,8 @@ import os
 import random
 import smtplib
 import time
+import jwt
+import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
@@ -46,6 +48,34 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# --- JWT & WEBSOCKET SECURITY CONFIGURATION ---
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("ThreatDetection")
+
+SECRET_KEY = "warisan-security-super-secret-key-change-in-production"
+ALGORITHM = "HS256"
+
+def verify_websocket_token(token: str):
+    """
+    Cryptographically verify incoming WebSocket connection tokens 
+    against the server's SECRET_KEY and specified ALGORITHM.
+    Enforces mandatory claim validation ('sub' and 'role').
+    """
+    try:
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM],
+        )
+
+        if not payload.get("sub") or not payload.get("role"):
+            return None
+
+        return payload
+
+    except jwt.InvalidTokenError:
+        return None
 
 # --- GLOBAL SESSION STATE INITIALIZATION ---
 if "user_email" not in st.session_state:
@@ -1104,7 +1134,7 @@ with st.expander("🔬 Show Deep LSTM Layer Diagnostics & Neural Network Logs"):
 
 st.divider()
 
-# --- ADMIN-ONLY REGISTERED USER ACCOUNTS & LOGIN STATISTICS TABLE ---
+# --- ADMIN-ONLY REGISTERED USER ACCOUNTS & LOGIN STATISTICS TABLE (RBAC) ---
 if user_role == 'admin':
     st.subheader("👥 Registered User Accounts & Login Statistics")
     users_df = get_all_user_accounts()
