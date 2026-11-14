@@ -44,6 +44,17 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# --- FORCE SIDEBAR TO STAY OPEN & EXPANDED ---
+st.markdown("""
+    <style>
+    section[data-testid="stSidebar"] {
+        display: block !important;
+        visibility: visible !important;
+        transform: translateX(0px) !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- GLOBAL SESSION STATE INITIALIZATION ---
 if "user_email" not in st.session_state:
     st.session_state["user_email"] = None
@@ -599,7 +610,7 @@ if not st.session_state["logged_in"]:
                 reg_user = st.text_input("Choose Username", key="reg_username")
                 reg_email = st.text_input("Email Address (For Notifications & OTP)", key="reg_email")
                 reg_pass = st.text_input("Choose Password", type="password", key="reg_password")
-                reg_confirm_pass = st.text_input("Confirm Password", type="password", key="reg_confirm_pass")
+                reg_confirm_pass = st.text_input("Confirm Password", type="password", key="reg_confirm_password")
                 
                 st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
                 if st.button("Register Account", use_container_width=True, type="primary"):
@@ -1038,7 +1049,7 @@ if user_role == 'admin':
         use_container_width=True,
     )
 else:
-    st.sidebar.caption("🔒 *Report broadcasts and file downloads are restricted to Administrator accounts.*")
+    st.sidebar.caption("🔒 *Live Telemetry, SOAR response, report broadcasts & downloads are restricted to Administrator accounts.*")
 
 # --- METRICS ROW ---
 m1, m2, m3, m4 = st.columns(4)
