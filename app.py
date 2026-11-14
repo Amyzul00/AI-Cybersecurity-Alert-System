@@ -84,6 +84,16 @@ if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
 # --- FONT AWESOME CDN FOR SIDEBAR ICONS ---
 st.markdown('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">', unsafe_allow_html=True)
 
+# --- HIDE TOP-RIGHT TOOLBAR BUTTONS (KEEPING THREE-DOT MENU) ---
+st.markdown("""
+    <style>
+    /* Hide specific toolbar action buttons while preserving the main menu container */
+    [data-testid="stToolbar"] > div:not(:last-child) {
+        display: none !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- ELITE SOC AUTH & GLOBAL STYLING ---
 st.markdown("""
     <style>
