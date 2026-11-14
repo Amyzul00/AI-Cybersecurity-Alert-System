@@ -962,7 +962,7 @@ with st.sidebar.expander("🎛️ Filter & Analysis Controls", expanded=True):
     )
     filtered_df = df[df["Threat"].isin(selected_threats)] if not df.empty else df
 
-# --- LIVE STREAM TELEMETRY & SOAR (ACCESSIBLE TO ALL USERS) ---
+# --- LIVE STREAM TELEMETRY & SOAR (AVAILABLE FOR ALL USERS) ---
 with st.sidebar.expander("📡 Live Stream Telemetry", expanded=False):
     stream_live = st.toggle("Enable Live Packet Feed", value=False)
     if stream_live:
