@@ -420,7 +420,6 @@ if not st.session_state["logged_in"]:
                         if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
                             st.session_state.role = "admin"
                         
-                        # Increment Login Count in DB
                         increment_user_login(st.session_state["temp_email"])
                         
                         st.session_state["otp_required"] = False
@@ -873,12 +872,6 @@ if user_role == 'admin':
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🛠️ Operations & Reports")
 
-    if st.sidebar.button("📊 View Registered Users & Logins", use_container_width=True):
-        st.subheader("👥 Registered User Accounts & Login Statistics")
-        users_df = get_all_user_accounts()
-        st.dataframe(users_df, use_container_width=True)
-        st.divider()
-
     if st.sidebar.button("📧 Email PDF Report to All Users", use_container_width=True):
         try:
             recipient_emails = get_all_registered_users()
@@ -1108,6 +1101,13 @@ with st.expander("🔬 Show Deep LSTM Layer Diagnostics & Neural Network Logs"):
 """,
         language="bash",
     )
+
+st.divider()
+
+# --- MOVED REGISTERED USER ACCOUNTS & LOGIN STATISTICS TABLE HERE ---
+st.subheader("👥 Registered User Accounts & Login Statistics")
+users_df = get_all_user_accounts()
+st.dataframe(users_df, use_container_width=True)
 
 st.divider()
 
