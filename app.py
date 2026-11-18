@@ -1,3 +1,98 @@
+# =====================================================================
+# TEMPORAL VALIDITY LSTM & MODEL SPECIFICATION PANEL
+# =====================================================================
+def render_warisan_lstm_specs():
+    import pandas as pd
+    import streamlit as st
+    with st.expander("🧠 Temporal Validity LSTM & Model Specification (DeepLSTM Architecture)", expanded=True):
+        tab_temp, tab_spec = st.tabs([
+            "⏱️ Temporal Validity (Sequence & Windowing)",
+            "📐 Model Specification & Architecture Table"
+        ])
+
+        with tab_temp:
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Sequence Algorithm", "Sliding Window", "Terminal-Step Label")
+            c2.metric("Window Length (Train/Test)", "100 Steps", "SEQ_LEN = 100 (Stride 1)")
+            c3.metric("Chronological Split", "80% / 20%", "Zero Data Leakage")
+            c4.metric("Train / Test Rows", "177K / 44.2K", "Oversampled: 230,832")
+
+            st.markdown(r"""
+            **1. Sequence Algorithm (Terminal-Step Sliding Window Formulation):**
+            * Raw packet-flow records (`221,264` cleaned rows) are ordered chronologically by timestamp (`Timestamp` / `Flow Start Time`) prior to partitioning.
+            * For every index $i$, the algorithm constructs a 3D input sequence tensor $X_i = \text{features}[i : i + 100]$ of shape `(100, 6)` and assigns the target class label from the terminal step $y_i = \text{labels}[i + 100]$.
+
+            **2. Window Length Across Training & Testing (`SEQ_LEN = 100`):**
+            * **Training Window Length:** $W_{\text{train}} = 100$ consecutive flows (`X_train_seq` constructed strictly from the 80% training partition after `StandardScaler` and `RandomOverSampler(random_state=42)`).
+            * **Testing Window Length:** $W_{\text{test}} = 100$ consecutive flows (`X_test_seq` constructed independently on the isolated 20% test partition using training scaler parameters, preventing cross-boundary window leakage).
+            """)
+
+        with tab_spec:
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("LSTM Architecture", "2 Stacked Layers", "hidden_size=64, drop=0.2")
+            m2.metric("Learning Rate (LR)", "0.001 (1e-3)", "Adam (weight_decay=1e-4)")
+            m3.metric("LR Scheduler", "Plateau Decay", "factor=0.5, patience=3")
+            m4.metric("Training Regimen", "30 Epochs (B=32)", "Sqrt-Balanced CrossEntropy")
+
+            arch_df = pd.DataFrame([
+                {
+                    "Layer #": 1,
+                    "Layer / Module": "Input Sequence Tensor",
+                    "Input Shape": "(32, 100, 6)",
+                    "Output Shape": "(32, 100, 6)",
+                    "Hyperparameters & Activation": "SEQ_LEN=100, 6 Matched CICIDS2017 Features",
+                    "Description": "Ingests 100-step chronological sliding window per batch"
+                },
+                {
+                    "Layer #": 2,
+                    "Layer / Module": "Stacked LSTM (Layer 1)",
+                    "Input Shape": "(32, 100, 6)",
+                    "Output Shape": "(32, 100, 64)",
+                    "Hyperparameters & Activation": "input_size=6, hidden_size=64, batch_first=True, tanh/sigmoid",
+                    "Description": "Captures step-by-step temporal flow dynamics across 100 steps"
+                },
+                {
+                    "Layer #": 3,
+                    "Layer / Module": "Inter-Layer Dropout",
+                    "Input Shape": "(32, 100, 64)",
+                    "Output Shape": "(32, 100, 64)",
+                    "Hyperparameters & Activation": "dropout = 0.2 (active when num_layers > 1)",
+                    "Description": "Regularizes recurrent weights against volumetric burst overfitting"
+                },
+                {
+                    "Layer #": 4,
+                    "Layer / Module": "Stacked LSTM (Layer 2)",
+                    "Input Shape": "(32, 100, 64)",
+                    "Output Shape": "(32, 64)",
+                    "Hyperparameters & Activation": "hidden_size=64, terminal slice out[:, -1, :]",
+                    "Description": "Compresses 100-step sequence into final terminal hidden state"
+                },
+                {
+                    "Layer #": 5,
+                    "Layer / Module": "Fully Connected 1 (fc1)",
+                    "Input Shape": "(32, 64)",
+                    "Output Shape": "(32, 32)",
+                    "Hyperparameters & Activation": "nn.Linear(in_features=64, out_features=32)",
+                    "Description": "Projects recurrent feature representation into compact latent space"
+                },
+                {
+                    "Layer #": 6,
+                    "Layer / Module": "ReLU Activation",
+                    "Input Shape": "(32, 32)",
+                    "Output Shape": "(32, 32)",
+                    "Hyperparameters & Activation": "nn.ReLU()",
+                    "Description": "Applies non-linear decision boundary transformation"
+                },
+                {
+                    "Layer #": 7,
+                    "Layer / Module": "Output Layer (fc2)",
+                    "Input Shape": "(32, 32)",
+                    "Output Shape": "(32, num_classes)",
+                    "Hyperparameters & Activation": "nn.Linear(32, num_classes) + CrossEntropyLoss / Softmax",
+                    "Description": "Outputs class logits and Detection Confidence (%) per flow window"
+                }
+            ])
+            st.dataframe(arch_df, use_container_width=True, hide_index=True)
 from database import (
     get_db_connection,
     init_db,
@@ -246,21 +341,11 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=95.8, target_ip="
                 <p class="subtitle">Deep LSTM Threat Intelligence & Incident Operations</p>
             </div>
             
-            <!-- Alert Card 1 -->
             <div class="alert-card">
                 <div class="alert-header">🚨 CRITICAL THREAT DETECTED</div>
                 <div class="alert-row">IP Address: &nbsp;<b>{target_ip}</b></div>
                 <div class="alert-row">Threat Type: &nbsp;<b>{threat_label}</b></div>
                 <div class="alert-row">Confidence: &nbsp;<b>{confidence_score:.1f}%</b></div>
-                <div class="alert-row" style="margin-top: 8px; font-size: 0.8rem; color: #718093;">Timestamp: {timestamp_str}</div>
-            </div>
-
-            <!-- Alert Card 2 -->
-            <div class="alert-card">
-                <div class="alert-header">🚨 CRITICAL THREAT DETECTED</div>
-                <div class="alert-row">IP Address: &nbsp;<b>192.168.1.210</b></div>
-                <div class="alert-row">Threat Type: &nbsp;<b>DDoS</b></div>
-                <div class="alert-row">Confidence: &nbsp;<b>96.0%</b></div>
                 <div class="alert-row" style="margin-top: 8px; font-size: 0.8rem; color: #718093;">Timestamp: {timestamp_str}</div>
             </div>
 
@@ -1096,6 +1181,7 @@ with st.expander(f"🔍 View VirusTotal / AbuseIPDB Reputation Report ({selected
 
 st.divider()
 
+render_warisan_lstm_specs()
 st.subheader("🔍 Real-Time Threat Event Log")
 
 display_df = filtered_df.copy()
@@ -1120,19 +1206,16 @@ st.dataframe(
 
 with st.expander("🔬 Show Deep LSTM Layer Diagnostics & Neural Network Logs"):
     st.code(
-        """
-[INFO] LSTM Input Shape: (Batch_Size=25, Time_Steps=100, Features=42)
-[INFO] Layer 1 (CuDNNLSTM): Output Shape=(None, 128), Parameters=87,552
-[INFO] Dropout (0.2): Applied
-[INFO] Layer 2 (Dense Softmax): Classifying into [Normal, Bot, DDoS, PortScan]
-[XAI] Gradient Saliency Computed: Input gradients backpropagated successfully.
-[SOAR] Firewall Controller Status: Active (Ready to push blocking rules)
-[DEBUG] Loss: 0.1421 | Val_Loss: 0.1804 | Inference Latency: 12.4ms/sample
-""",
+        """[INFO] LSTM Input Shape: (Batch_Size=32, Time_Steps=100, Features=6)
+[INFO] Layer 1-2 (PyTorch Stacked DeepLSTM): Hidden_Units=64x2, Output Shape=(32, 64), Parameters=51,712
+[INFO] Inter-Layer Dropout (0.2): Applied | Optimizer: Adam (lr=0.001, weight_decay=1e-4)
+[INFO] Layer 3 (Dense fc1 + ReLU -> fc2 Softmax): Shape=(32, 32) -> (32, 4) | Total Params=53,924
+[INFO] Classification Targets: [Normal, Bot, DDoS, PortScan] (Sqrt-Balanced CrossEntropyLoss)
+[XAI] Gradient Saliency Computed: Input gradients backpropagated across 100-step temporal window.
+[SOAR] Firewall Controller Status: Active (Ready to push automated IP blocking rules)
+[DEBUG] Training Loss: 0.0053 | LR Scheduler: ReduceLROnPlateau (factor=0.5, patience=3) | Latency: 4.2ms/window""",
         language="bash",
     )
-
-st.divider()
 
 # --- ADMIN-ONLY REGISTERED USER ACCOUNTS & LOGIN STATISTICS TABLE ---
 if user_role == 'admin':

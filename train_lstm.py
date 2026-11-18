@@ -7,8 +7,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
-from sklearn.preprocessing import MinMaxScaler, LabelEncoder
-from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.utils.class_weight import compute_class_weight
 from sklearn.metrics import classification_report, confusion_matrix
 from imblearn.over_sampling import RandomOverSampler
@@ -21,7 +20,7 @@ warnings.filterwarnings('ignore')
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_PATH = os.path.join(BASE_DIR, "data", "DDoS-Friday-no-metadata.parquet")
 
-SEQ_LEN = 5          # Temporal sequence window size
+SEQ_LEN = 100        # 100-step temporal window for thesis compliance
 EPOCHS = 30          # Training epochs for loss convergence
 BATCH_SIZE = 32      # Batch size for generalization
 LEARNING_RATE = 0.001
@@ -30,7 +29,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"[+] Using device: {device}")
 
 # -------------------------------------------------------------------
-# 2. LOAD & CLEAN DATASET (USING TARGET FEATURES)
+# 2. LOAD & CHRONOLOGICALLY SORT DATASET
 # -------------------------------------------------------------------
 if not os.path.exists(DATA_PATH):
     fallback_path = os.path.join(BASE_DIR, "data", "cicids2017.csv")
@@ -73,52 +72,74 @@ if not label_col:
     raise KeyError("[!] 'Label' column not found in dataset.")
 
 LABEL_NAME = label_col[0]
+
+# Detect timestamp column to enforce chronological ordering validation
+timestamp_col = None
+for col in ["Timestamp", "Flow Start Time", "Time"]:
+    if col in df.columns:
+        timestamp_col = col
+        break
+
 cols_to_use = matched_features + [LABEL_NAME]
+if timestamp_col and timestamp_col not in cols_to_use:
+    cols_to_use.append(timestamp_col)
 
 df_clean = df[cols_to_use].replace([np.inf, -np.inf], np.nan).dropna()
+
+# Enforce Chronological Sorting Key
+if timestamp_col:
+    df_clean[timestamp_col] = pd.to_datetime(df_clean[timestamp_col], errors="coerce")
+    df_clean = df_clean.sort_values(by=timestamp_col).reset_index(drop=True)
+    df_clean = df_clean.drop(columns=[timestamp_col])
+    print(f"[+] Enforced chronological ordering using timestamp column: '{timestamp_col}'.")
+else:
+    print("[!] Warning: No timestamp column detected. Maintaining sequential entry order.")
+    df_clean = df_clean.reset_index(drop=True)
+
 print(f"[+] Dataset cleaned successfully: {len(df_clean)} records.")
 
-X = df_clean[matched_features].values
-y = df_clean[LABEL_NAME].values
+# -------------------------------------------------------------------
+# 3. EXPLICIT DATAFRAME SPLITTING & SCALING (ZERO DATA LEAKAGE PROTOCOL)
+# -------------------------------------------------------------------
+split_idx = int(len(df_clean) * 0.80)  # 80% train, 20% test partition
 
-# Encode labels
+train_df = df_clean.iloc[:split_idx].copy()
+test_df = df_clean.iloc[split_idx:].copy()
+
+print(f"[+] Explicit Partitioning -> Train rows: {len(train_df)} | Test rows: {len(test_df)}")
+
+# Scale features strictly on training partition
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(train_df[matched_features].values)
+X_test_scaled = scaler.transform(test_df[matched_features].values)
+
+# Encode labels strictly on training encoder and transform test labels
 label_encoder = LabelEncoder()
-y_encoded = label_encoder.fit_transform(y)
+y_train_raw = label_encoder.fit_transform(train_df[LABEL_NAME].values)
+y_test_raw = label_encoder.transform(test_df[LABEL_NAME].values)
 
-# Scale features using MinMaxScaler
-scaler = MinMaxScaler()
-X_scaled = scaler.fit_transform(X)
-
-# Handle class imbalance using RandomOverSampler
+# Optional balancing strictly on training partition to avoid test leakage
 ros = RandomOverSampler(random_state=42)
-X_resampled, y_resampled = ros.fit_resample(X_scaled, y_encoded)
-print(f"[+] Oversampled dataset from {len(X_scaled)} to {len(X_resampled)} samples.")
+X_train_resampled, y_train_resampled = ros.fit_resample(X_train_scaled, y_train_raw)
+print(f"[+] Partition 1 (Train): Oversampled from {len(X_train_scaled)} to {len(X_train_resampled)} records.")
+print(f"[+] Partition 2 (Test) : Isolated test records maintained at {len(X_test_scaled)} records.")
 
 # -------------------------------------------------------------------
-# 3. CREATE SLIDING WINDOW SEQUENCES
+# 4. INDEPENDENT SLIDING WINDOW SEQUENCE CONSTRUCTION
 # -------------------------------------------------------------------
-def create_sequences(features, labels, seq_len=5):
+def create_sliding_windows(features, labels, seq_len=100):
     xs, ys = [], []
     for i in range(len(features) - seq_len):
-        xs.append(features[i:i + seq_len])
-        ys.append(labels[i + seq_len])
-    return np.array(xs), np.array(ys)
+        xs.append(features[i : i + seq_len])
+        ys.append(labels[i + seq_len]) # Terminal-step labeling strategy
+    return np.array(xs, dtype=np.float32), np.array(ys, dtype=np.int64)
 
-print(f"[+] Constructing temporal sequence data (Window Size = {SEQ_LEN})...")
-X_seq, y_seq = create_sequences(X_resampled, y_resampled, seq_len=SEQ_LEN)
+print(f"[+] Constructing leak-free temporal sequences (Window Size = {SEQ_LEN})...")
+X_train_seq, y_train_seq = create_sliding_windows(X_train_resampled, y_train_resampled, seq_len=SEQ_LEN)
+X_test_seq, y_test_seq = create_sliding_windows(X_test_scaled, y_test_raw, seq_len=SEQ_LEN)
 
-X_train, X_test, y_train, y_test = train_test_split(
-    X_seq, y_seq, test_size=0.2, random_state=42, stratify=y_seq
-)
-
-train_dataset = TensorDataset(
-    torch.tensor(X_train, dtype=torch.float32), 
-    torch.tensor(y_train, dtype=torch.long)
-)
-test_dataset = TensorDataset(
-    torch.tensor(X_test, dtype=torch.float32), 
-    torch.tensor(y_test, dtype=torch.long)
-)
+train_dataset = TensorDataset(torch.tensor(X_train_seq), torch.tensor(y_train_seq))
+test_dataset = TensorDataset(torch.tensor(X_test_seq), torch.tensor(y_test_seq))
 
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
@@ -126,14 +147,14 @@ test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 # Compute class weights
 class_weights_np = compute_class_weight(
     class_weight='balanced',
-    classes=np.unique(y_train),
-    y=y_train
+    classes=np.unique(y_train_seq),
+    y=y_train_seq
 )
 adjusted_weights = np.sqrt(class_weights_np)
 class_weights_tensor = torch.tensor(adjusted_weights, dtype=torch.float32).to(device)
 
 # -------------------------------------------------------------------
-# 4. DEEP LSTM ARCHITECTURE
+# 5. DEEP LSTM ARCHITECTURE
 # -------------------------------------------------------------------
 class DeepLSTM(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, num_classes):
@@ -175,7 +196,7 @@ optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-4)
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3)
 
 # -------------------------------------------------------------------
-# 5. TRAINING LOOP
+# 6. TRAINING LOOP
 # -------------------------------------------------------------------
 print(f"\n[+] Starting Deep LSTM model training for {EPOCHS} epochs...")
 
@@ -198,9 +219,9 @@ for epoch in range(EPOCHS):
     print(f"Epoch [{epoch+1}/{EPOCHS}] - Loss: {avg_loss:.4f}")
 
 # -------------------------------------------------------------------
-# 6. EVALUATION
+# 7. EVALUATION
 # -------------------------------------------------------------------
-print("\n[+] Evaluating model performance on Test Set...")
+print("\n[+] Evaluating model performance on Leak-Free Test Set...")
 model.eval()
 all_preds = []
 all_targets = []
@@ -220,7 +241,7 @@ print("\n--- Classification Report ---")
 print(classification_report(all_targets, all_preds, target_names=label_encoder.classes_))
 
 # -------------------------------------------------------------------
-# 7. SAVE ARTIFACTS
+# 8. SAVE ARTIFACTS
 # -------------------------------------------------------------------
 model_path = os.path.join(BASE_DIR, 'model_lstm.pth')
 scaler_path = os.path.join(BASE_DIR, 'scaler_lstm.pkl')
