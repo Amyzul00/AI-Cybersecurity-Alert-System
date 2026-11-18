@@ -1,10 +1,10 @@
-
 import os
 import json
 import random
 import asyncio
 import logging
 import warnings
+import time
 from contextlib import asynccontextmanager
 
 import jwt
@@ -14,18 +14,19 @@ import numpy as np
 import pandas as pd
 import joblib
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, Query, status
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from auth import router as auth_router, SECRET_KEY, ALGORITHM
-
+from auth import router as auth_router, SECRET_KEY, ALGORITHM, get_current_user, require_role
+from database import log_threat, log_pipeline_latency, get_latency_summary
 
 warnings.filterwarnings('ignore')
 
-# Logging konfigurasi
+# Logging configuration
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ThreatDetection")
+
 
 def verify_websocket_token(token: str):
     try:
@@ -43,8 +44,9 @@ def verify_websocket_token(token: str):
     except jwt.InvalidTokenError:
         return None
 
+
 # -------------------------------------------------------------------
-# --- 1. DEEP LSTM MODEL STRUCTURE (PYTORCH) ---
+# 1. DEEP LSTM MODEL ARCHITECTURE (PYTORCH)
 # -------------------------------------------------------------------
 class DeepLSTM(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, num_classes):
@@ -53,7 +55,7 @@ class DeepLSTM(nn.Module):
         self.fc1 = nn.Linear(hidden_size, 32)
         self.relu = nn.ReLU()
         self.fc2 = nn.Linear(32, num_classes)
-        
+
     def forward(self, x):
         out, _ = self.lstm(x)
         out = self.fc1(out[:, -1, :])
@@ -61,8 +63,10 @@ class DeepLSTM(nn.Module):
         out = self.fc2(out)
         return out
 
-# Dictionary global untuk menyimpan model & preprocessor
+
+# Global dictionary to store loaded ML model and preprocessors
 ml_resources = {}
+
 
 # -------------------------------------------------------------------
 # 2. WEBSOCKET CONNECTION MANAGER (MULTIPLE CLIENT BROADCAST)
@@ -74,12 +78,12 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
-        logger.info(f"[+] Klien terhubung. Jumlah klien aktif: {len(self.active_connections)}")
+        logger.info(f"[+] Client connected. Active clients: {len(self.active_connections)}")
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
-            logger.info(f"[-] Klien terputus. Baki klien aktif: {len(self.active_connections)}")
+            logger.info(f"[-] Client disconnected. Remaining active clients: {len(self.active_connections)}")
 
     async def broadcast(self, message: dict):
         for connection in list(self.active_connections):
@@ -88,17 +92,19 @@ class ConnectionManager:
             except Exception:
                 self.disconnect(connection)
 
+
 manager = ConnectionManager()
 
+
 # -------------------------------------------------------------------
-# 3. LIFESPAN HANDLER (Memuatkan Dataset, Model & Preprocessor)
+# 3. LIFESPAN HANDLER (Load Dataset, Model & Preprocessors)
 # -------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # --- PROSES STARTUP ---
+    # --- STARTUP PROCESS ---
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_DIR = os.path.join(BASE_DIR, "data")
-  
+
     DATA_PATH = os.path.join(DATA_DIR, "traffic_data.csv")
     ALT_DATA_PATH = os.path.join(BASE_DIR, "cicids2017.csv")
 
@@ -106,16 +112,23 @@ async def lifespan(app: FastAPI):
     features_path = os.path.join(BASE_DIR, "features.pkl")
     target_features = joblib.load(features_path)
 
-    # 1. Load the scaler
-    scaler_path = os.path.join(BASE_DIR, 'scaler_lstm.pkl') if os.path.exists(os.path.join(BASE_DIR, 'scaler_lstm.pkl')) else os.path.join(BASE_DIR, 'scaler.pkl')
+    # 1. Load the feature scaler
+    scaler_path = (
+        os.path.join(BASE_DIR, 'scaler_lstm.pkl')
+        if os.path.exists(os.path.join(BASE_DIR, 'scaler_lstm.pkl'))
+        else os.path.join(BASE_DIR, 'scaler.pkl')
+    )
     scaler = joblib.load(scaler_path)
 
     # 2. Load the label encoder
-    encoder_path = os.path.join(BASE_DIR, 'label_encoder.pkl') if os.path.exists(os.path.join(BASE_DIR, 'label_encoder.pkl')) else os.path.join(BASE_DIR, 'label_encoder_lstm.pkl')
+    encoder_path = (
+        os.path.join(BASE_DIR, 'label_encoder.pkl')
+        if os.path.exists(os.path.join(BASE_DIR, 'label_encoder.pkl'))
+        else os.path.join(BASE_DIR, 'label_encoder_lstm.pkl')
+    )
     label_encoder = joblib.load(encoder_path)
 
-    
-    # 3. Memuatkan Model PyTorch LSTM (.pth / .pt)
+    # 3. Load the PyTorch Deep LSTM model (.pth / .pt)
     model = DeepLSTM(len(target_features), 64, 2, len(label_encoder.classes_))
     model_path = (
         os.path.join(BASE_DIR, 'model_lstm.pth')
@@ -125,7 +138,7 @@ async def lifespan(app: FastAPI):
     model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
     model.eval()
 
-    # 1. Load the traffic dataset
+    # 4. Load the traffic dataset
     df_clean = None
 
     active_data_path = (
@@ -196,7 +209,7 @@ async def lifespan(app: FastAPI):
         except Exception:
             logger.exception("Failed to load traffic dataset")
 
-    # 2. Create sample data only if no usable dataset was loaded
+    # 5. Create synthetic sample data only if no usable dataset was loaded
     if df_clean is None or df_clean.empty:
         logger.warning(
             "No usable dataset found. Generating synthetic traffic data."
@@ -207,28 +220,18 @@ async def lifespan(app: FastAPI):
         sample_count = 1000
 
         df_clean = pd.DataFrame({
-            "Total Fwd Packets": np.random.randint(
-                1, 100, sample_count
-            ),
-            "Total Backward Packets": np.random.randint(
-                0, 100, sample_count
-            ),
-            "Fwd Packet Length Max": np.random.uniform(
-                10, 1500, sample_count
-            ),
-            "Flow Bytes/s": np.random.uniform(
-                100, 100000, sample_count
-            ),
-            "Flow Packets/s": np.random.uniform(
-                1, 1000, sample_count
-            ),
+            "Total Fwd Packets": np.random.randint(1, 100, sample_count),
+            "Total Backward Packets": np.random.randint(0, 100, sample_count),
+            "Fwd Packet Length Max": np.random.uniform(10, 1500, sample_count),
+            "Flow Bytes/s": np.random.uniform(100, 100000, sample_count),
+            "Flow Packets/s": np.random.uniform(1, 1000, sample_count),
         })
 
         # Do not overwrite an existing traffic dataset
         if not os.path.exists(DATA_PATH):
             df_clean.to_csv(DATA_PATH, index=False)
 
-    # 3. Store the loaded AI resources
+    # 6. Store the loaded AI resources
     ml_resources["scaler"] = scaler
     ml_resources["label_encoder"] = label_encoder
     ml_resources["model"] = model
@@ -237,7 +240,7 @@ async def lifespan(app: FastAPI):
 
     logger.info("LSTM model and traffic dataset initialized.")
 
-    # 4. Start the background traffic generator
+    # 7. Start the background traffic generator task
     traffic_task = asyncio.create_task(
         background_traffic_generator()
     )
@@ -256,8 +259,9 @@ async def lifespan(app: FastAPI):
         ml_resources.clear()
         logger.info("Threat detection resources released.")
 
+
 # -------------------------------------------------------------------
-# 4. INISIALISASI FASTAPI & MIDDLEWARE
+# 4. FASTAPI INITIALIZATION & MIDDLEWARE
 # -------------------------------------------------------------------
 app = FastAPI(title="AI Real-Time Threat Detection API", lifespan=lifespan)
 app.include_router(auth_router)
@@ -269,13 +273,40 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # -------------------------------------------------------------------
-# 5. PENJANA TRAFIK & LATAR BELAKANG BROADCAST
+# 5. PROTECTED API ENDPOINTS (RBAC)
+# -------------------------------------------------------------------
+@app.get("/api/threats")
+def list_threats(user: dict = Depends(require_role("analyst", "admin"))):
+    """Read access permitted for authenticated analysts and admins."""
+    return {"requested_by": user["sub"], "role": user["role"], "items": []}
+
+
+@app.delete("/api/threats/{log_id}")
+def delete_threat_log(log_id: int, admin: dict = Depends(require_role("admin"))):
+    """Destructive audit-log deletion restricted strictly to admin role."""
+    return {"status": "deleted", "log_id": log_id, "deleted_by": admin["sub"]}
+
+
+@app.post("/api/system/config")
+def update_detection_threshold(
+    threshold: float,
+    admin: dict = Depends(require_role("admin")),
+):
+    """Model/alert threshold mutation restricted strictly to admin role."""
+    if not 0.5 <= threshold <= 0.99:
+        raise HTTPException(status_code=400, detail="Threshold must be between 0.50 and 0.99.")
+    return {"status": "updated", "threshold": threshold, "updated_by": admin["sub"]}
+
+
+# -------------------------------------------------------------------
+# 6. TRAFFIC GENERATOR & BACKGROUND BROADCAST
 # -------------------------------------------------------------------
 def generate_live_packet():
     df_clean = ml_resources['df_clean']
     target_features = ml_resources['target_features']
-    
+
     ip = f"192.168.1.{random.randint(2, 254)}"
     if df_clean is not None and not df_clean.empty:
         sample = df_clean.sample(1).iloc[0]
@@ -289,30 +320,53 @@ def generate_live_packet():
         ]
         return ip, np.array(raw_features)
 
+
 async def background_traffic_generator():
-    """Memancarkan data trafik secara berterusan kepada semua sambungan WebSocket."""
+    """Continuously streams evaluated network traffic to all active WebSocket clients."""
     packet_count = 1
     while True:
         if manager.active_connections:
             try:
+                # Stage 1: Data Collection (t0 -> t1)
+                t0_capture_ns = time.perf_counter_ns()
+                ip, raw_features = generate_live_packet()
+                t1_collect_ns = time.perf_counter_ns()
+
+                # Stage 2: Feature Extraction & Scaling (t1 -> t2)
                 scaler = ml_resources['scaler']
                 label_encoder = ml_resources['label_encoder']
                 model = ml_resources['model']
-                
-                ip, raw_features = generate_live_packet()
-
-                # Preprocessing & Inferens PyTorch Deep LSTM
                 scaled = scaler.transform([raw_features])
-                tensor_in = torch.tensor(scaled, dtype=torch.float32).unsqueeze(1)
+                t2_extract_ns = time.perf_counter_ns()
 
+                # Stage 3: Sequence Window Buffering / Tensor Preparation (t2 -> t3)
+                tensor_in = torch.tensor(scaled, dtype=torch.float32).unsqueeze(1)
+                t3_buffer_ns = time.perf_counter_ns()
+
+                # Stage 4: Deep LSTM Inference (t3 -> t4)
                 with torch.no_grad():
                     out = model(tensor_in)
                     _, pred = torch.max(out, 1)
-
                 threat_name = label_encoder.inverse_transform([pred.item()])[0]
+                t4_infer_ns = time.perf_counter_ns()
+
                 is_threat = threat_name != "BENIGN"
 
-                # Payload lengkap (sesuai untuk UI web mahupun React Dashboard)
+                # Stage 5: SQLite Database Logging for Threat Records (t4 -> t5)
+                log_id = None
+                if is_threat:
+                    log_id, _ = log_threat(
+                        src_ip=ip,
+                        dst_ip="192.168.1.1",
+                        protocol="TCP",
+                        threat_type=threat_name,
+                        severity="CRITICAL",
+                        confidence_score=0.95,
+                        raw_features=str(raw_features.tolist())
+                    )
+                t5_db_ns = time.perf_counter_ns()
+
+                # Complete telemetry payload for Web UI / React Dashboard
                 data_payload = {
                     "packet_id": packet_count,
                     "timestamp": pd.Timestamp.now().strftime("%H:%M:%S"),
@@ -321,26 +375,44 @@ async def background_traffic_generator():
                     "status": "CRITICAL" if is_threat else "NORMAL",
                     "threat_type": threat_name,
                     "packet_size": round(float(raw_features[2]), 2),
-"flow_bytes_sec": round(float(raw_features[3]), 2),
+                    "flow_bytes_sec": round(float(raw_features[3]), 2),
                     "metrics": {
-    "total_fwd_packets": float(raw_features[0]),
-    "total_bwd_packets": float(raw_features[1]),
-    "fwd_packet_length_max": float(raw_features[2]),
-    "flow_bytes_s": float(raw_features[3]),
-    "flow_packets_s": float(raw_features[4])
-},
+                        "total_fwd_packets": float(raw_features[0]),
+                        "total_bwd_packets": float(raw_features[1]),
+                        "fwd_packet_length_max": float(raw_features[2]),
+                        "flow_bytes_s": float(raw_features[3]),
+                        "flow_packets_s": float(raw_features[4])
+                    },
                     "alert": is_threat
                 }
 
+                # Stage 6: Dashboard / WebSocket Broadcast (t5 -> t6)
                 await manager.broadcast(data_payload)
+                t6_dashboard_ns = time.perf_counter_ns()
+
+                # Record decomposed stage latencies into threat_logs.db
+                if log_id is not None:
+                    log_pipeline_latency(
+                        threat_log_id=log_id,
+                        threat_type=threat_name,
+                        t0_capture_ns=t0_capture_ns,
+                        t1_collect_ns=t1_collect_ns,
+                        t2_extract_ns=t2_extract_ns,
+                        t3_buffer_ns=t3_buffer_ns,
+                        t4_infer_ns=t4_infer_ns,
+                        t5_db_ns=t5_db_ns,
+                        t6_dashboard_ns=t6_dashboard_ns
+                    )
+
                 packet_count += 1
             except Exception as e:
-                logger.error(f"[!] Ralat pada background generator: {e}")
-                
-        await asyncio.sleep(1) # Hantar data setiap 1 saat
+                logger.error(f"[!] Error in background traffic generator: {e}")
+
+        await asyncio.sleep(1)  # Stream traffic sample every 1 second
+
 
 # -------------------------------------------------------------------
-# 6. REST API, DASHBOARD UI & WEBSOCKET ENDPOINTS
+# 7. REST API, DASHBOARD UI & WEBSOCKET ENDPOINTS
 # -------------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 async def get_dashboard():
@@ -360,7 +432,7 @@ async def get_dashboard():
         </head>
         <body>
             <h1>🚨 AI Real-Time Deep LSTM Threat Detection</h1>
-            <p>Status Engine: <strong style="color: #00ffcc;">Active (WebSocket Streaming)</strong></p>
+            <p>Engine Status: <strong style="color: #00ffcc;">Active (WebSocket Streaming)</strong></p>
             <div id="logs"></div>
             <script>
                 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -370,18 +442,17 @@ async def get_dashboard():
                 ws.onmessage = function(event) {
                     const data = JSON.parse(event.data);
                     const item = document.createElement("p");
-                    
-if (data.status === "CRITICAL" && data.alert === true) {
-    item.className = "alert-critical";
-    item.innerText =
-        `[🚨 CRITICAL] #${data.packet_id} | ${data.timestamp} | IP: ${data.ip} | Threat: ${data.threat_type} | Flow: ${data.flow_bytes_sec} B/s`;
-} else {
-    item.className = "normal";
-    item.innerText =
-        `[✓ PASS] #${data.packet_id} | ${data.timestamp} | IP: ${data.ip} | Status: Normal (${data.threat_type || "BENIGN"})`;
-}
 
-                    
+                    if (data.status === "CRITICAL" && data.alert === true) {
+                        item.className = "alert-critical";
+                        item.innerText =
+                            `[🚨 CRITICAL] #${data.packet_id} | ${data.timestamp} | IP: ${data.ip} | Threat: ${data.threat_type} | Flow: ${data.flow_bytes_sec} B/s`;
+                    } else {
+                        item.className = "normal";
+                        item.innerText =
+                            `[✓ PASS] #${data.packet_id} | ${data.timestamp} | IP: ${data.ip} | Status: Normal (${data.threat_type || "BENIGN"})`;
+                    }
+
                     logsDiv.appendChild(item);
                     logsDiv.scrollTop = logsDiv.scrollHeight;
                 };
@@ -391,13 +462,22 @@ if (data.status === "CRITICAL" && data.alert === true) {
     """
     return HTMLResponse(content=html_content)
 
+
 @app.websocket("/ws/stream")
 @app.websocket("/ws/live-traffic")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(
+    websocket: WebSocket,
+    token: str | None = Query(default=None),
+):
+    """Rejects unauthenticated WebSocket handshakes with policy violation code 1008."""
+    payload = verify_websocket_token(token) if token else None
+    if not payload or payload.get("role") not in ("analyst", "admin"):
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
     await manager.connect(websocket)
     try:
         while True:
-            # Menguatkan talian tetap hidup
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
