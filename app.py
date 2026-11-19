@@ -20,7 +20,7 @@ def render_warisan_lstm_specs():
             st.markdown(r"""
             **1. Sequence Algorithm (Terminal-Step Sliding Window Formulation):**
             * Raw packet-flow records (`221,264` cleaned rows) are ordered chronologically by timestamp (`Timestamp` / `Flow Start Time`) prior to partitioning.
-            * For every index $i$, the algorithm constructs a 3D input sequence tensor $X_i = \text{features}[i : i + 100]$ of shape `(100, 6)` and assigns the target class label from the terminal step $y_i = \text{labels}[i + 100]$.
+            * For every index $i$, the algorithm constructs a 3D input sequence tensor $X_i = \text{features}[i : i + 100]$ of shape `(100, 5)` and assigns the target class label from the terminal step $y_i = \text{labels}[i + 100]$.
 
             **2. Window Length Across Training & Testing (`SEQ_LEN = 100`):**
             * **Training Window Length:** $W_{\text{train}} = 100$ consecutive flows (`X_train_seq` constructed strictly from the 80% training partition after `StandardScaler` and `RandomOverSampler(random_state=42)`).
