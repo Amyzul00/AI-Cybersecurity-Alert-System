@@ -973,10 +973,18 @@ with st.sidebar.expander("🛡️ Incident Response (SOAR)", expanded=False):
         "Select Host IP to Isolate:",
         options=filtered_df["IP"].unique() if not filtered_df.empty else ["N/A"],
     )
+        if "cleared_ips" not in st.session_state:
+            st.session_state.cleared_ips = set()
+
+        if st.button("Block IP & Push Firewall Rule", type="primary") and target_ip != "N/A":
+            with st.spinner(f"Pushing rule to iptables for {target_ip}..."):
+                time.sleep(1.0)
+            handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated (User: {st.session_state.get('username', 'Unknown')})")
+            st.session_state.cleared_ips.add(target_ip)
+            st.rerun()
 if "cleared_ips" not in st.session_state:
     st.session_state.cleared_ips = set()
 
-if st.button("🚨 Block IP & Push Firewall Rule", type="primary") and target_ip != "N/A":
     with st.spinner(f"Pushing rule to iptables for {target_ip}..."):
         time.sleep(1.0)
     handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated (User: {st.session_state['username']})")
