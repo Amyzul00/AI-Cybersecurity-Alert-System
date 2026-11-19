@@ -985,17 +985,6 @@ if st.button("🚨 Block IP & Push Firewall Rule", type="primary") and target_ip
     st.rerun()
 
 if user_role == 'admin':
-    cleared_list = sorted(list(st.session_state.get("cleared_ips", set())))
-    with st.expander("Cleared / Isolated IP Records (Admin)", expanded=False):
-        if cleared_list:
-            for ip in cleared_list:
-                st.write(f"� `{ip}` � Cleared via SOAR")
-            if st.button("Restore Cleared Alerts"):
-                st.session_state.cleared_ips.clear()
-                st.rerun()
-        else:
-            st.caption("No IP alerts have been cleared yet.")
-
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🛠️ Operations & Reports")
 
