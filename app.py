@@ -48,7 +48,7 @@ def render_warisan_lstm_specs():
                     "Layer / Module": "Stacked LSTM (Layer 1)",
                     "Input Shape": "(32, 100, 6)",
                     "Output Shape": "(32, 100, 64)",
-                    "Hyperparameters & Activation": "input_size=6, hidden_size=64, batch_first=True, tanh/sigmoid",
+                    "Hyperparameters & Activation": "input_size=5, hidden_size=64, batch_first=True, tanh/sigmoid",
                     "Description": "Captures step-by-step temporal flow dynamics across 100 steps"
                 },
                 {
@@ -1133,7 +1133,7 @@ with col_xai2:
         "**Why did the AI flag this event?**\n\n"
         "The Deep LSTM model heavily weighed **Flow Bytes/s** (28.4%) "
         "and **Flow Packets/s** (22.1%) across the 100-step temporal window as primary indicators for volumetric DDoS & botnet sequencing.\n\n"
-        "* **Attention Method:** Gradient Saliency Map (6 CICIDS2017 Features)\n"
+        "* **Attention Method:** Gradient Saliency Map (5 CICIDS2017 Features)\n"
         "* **Confidence Score Impact:** High correlation with anomalous temporal patterns."
     )
 
@@ -1204,7 +1204,7 @@ st.dataframe(
 
 with st.expander("🔬 Show Deep LSTM Layer Diagnostics & Neural Network Logs"):
     st.code(
-        """[INFO] LSTM Input Shape: (Batch_Size=32, Time_Steps=100, Features=6)
+        """[INFO] LSTM Input Shape: (Batch_Size=32, Time_Steps=100, Features=5)
 [INFO] Layer 1-2 (PyTorch Stacked DeepLSTM): Hidden_Units=64x2, Output Shape=(32, 64), Parameters=51,712
 [INFO] Inter-Layer Dropout (0.2): Applied | Optimizer: Adam (lr=0.001, weight_decay=1e-4)
 [INFO] Layer 3 (Dense fc1 + ReLU -> fc2 Softmax): Shape=(32, 32) -> (32, 4) | Total Params=53,924
