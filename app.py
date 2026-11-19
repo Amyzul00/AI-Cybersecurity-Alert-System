@@ -260,7 +260,7 @@ st.markdown('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs
 
 # --- HIDE TOP-RIGHT TOOLBAR BUTTONS & CONDITIONAL TOP PROGRESS BAR ---
 if not st.session_state["logged_in"]:
-    st.markdown("""
+                st.markdown("""
         <style>
         [data-testid="stToolbar"] > div:not(:last-child) {
             display: none !important;
@@ -275,7 +275,7 @@ if not st.session_state["logged_in"]:
         </style>
     """, unsafe_allow_html=True)
 else:
-    st.markdown("""
+                st.markdown("""
         <style>
         [data-testid="stToolbar"] > div:not(:last-child) {
             display: none !important;
@@ -284,7 +284,7 @@ else:
     """, unsafe_allow_html=True)
 
 # --- ELITE SOC AUTH & GLOBAL STYLING ---
-st.markdown("""
+                st.markdown("""
     <style>
     .block-container {
         padding-top: 2rem !important;
@@ -544,7 +544,7 @@ if not st.session_state["logged_in"]:
 
     col1, col2, col3 = st.columns([1, 1.35, 1])
     with col2:
-        st.markdown(f"""
+                st.markdown(f"""
             <div style="text-align: center; margin-bottom: 20px;">
                 {logo_html}
                 <h2 style="color: #ffffff; margin: 0; font-size: 1.4rem; font-weight: 700; letter-spacing: -0.5px; line-height: 1.3;">Warisan AI-Based Threat Detection & Real-time Alert System</h2>
@@ -553,14 +553,14 @@ if not st.session_state["logged_in"]:
         """, unsafe_allow_html=True)
 
         if st.session_state["otp_required"]:
-            st.markdown(f"""
+                st.markdown(f"""
                 <div style="background-color: #0e1626; border: 1px solid #1e293b; border-radius: 10px; padding: 16px; margin-bottom: 16px;">
                     <p style="margin: 0 0 6px 0; color: #94a3b8; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">🔒 Security Verification (2FA)</p>
                     <p style="margin: 0; color: #f8fafc; font-size: 0.95rem;">A verification code has been dispatched to: <b>{st.session_state['temp_email']}</b></p>
                 </div>
             """, unsafe_allow_html=True)
             
-            st.markdown(f"""
+                st.markdown(f"""
                 <div style="background-color: rgba(255, 75, 75, 0.08); border: 1px solid rgba(255, 75, 75, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
                     <p style="margin: 0; color: #ff8080; font-size: 0.88rem; font-weight: 500;">🔑 <b>Secure Authentication Key:</b> <code style="background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 4px; color: #fff;">{st.session_state['generated_otp']}</code></p>
                 </div>
@@ -749,7 +749,7 @@ if not st.session_state["logged_in"]:
 
         footer_logo_html = f'<img src="{logo_base64}" style="width: 16px; height: 16px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 6px;" alt="Logo">' if logo_base64 else '🛡️'
 
-        st.markdown(f"""
+                st.markdown(f"""
             <div style="text-align: center; margin-top: 24px; font-size: 0.78rem; color: #64748b;">
                 {footer_logo_html} Warisan AI-Based Threat Detection & Real-time Alert System — Secure 2FA Environment
             </div>
@@ -769,7 +769,7 @@ if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
     user_role = "admin"
 
 if logo_base64:
-    st.markdown(f"""
+                st.markdown(f"""
         <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 20px;">
             <img src="{logo_base64}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 10px rgba(0,0,0,0.5);" alt="Logo">
             <div>
@@ -961,7 +961,7 @@ if logo_base64:
     st.sidebar.markdown(f'<div style="text-align: center; margin-bottom: 12px;"><img src="{logo_base64}" style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 0 12px rgba(255,75,75,0.6);"></div>', unsafe_allow_html=True)
 
 with st.sidebar.expander("👤 User Profile & Session", expanded=True):
-    st.markdown(f"""
+                st.markdown(f"""
         <div style="background-color: #0d2318; border: 1px solid #1e4630; border-radius: 8px; padding: 10px; margin-bottom: 10px;">
             <p style="margin: 0; color: #4cd137; font-size: 0.9rem;">👤 User: <b>{st.session_state['username']}</b></p>
             <p style="margin: 4px 0 0 0; color: #fbc531; font-size: 0.9rem;">🔑 Role: <b>{st.session_state['role'].upper()}</b></p>
@@ -993,7 +993,7 @@ with st.sidebar.expander("🚨 Alert & Notification Center", expanded=False):
     
         if len(critical_alerts) > 0:
             for idx, row in critical_alerts.iterrows():
-            st.markdown(f"""
+                st.markdown(f"""
                 <div style="background-color: rgba(255, 75, 75, 0.12); border: 1px solid rgba(255, 75, 75, 0.35); border-radius: 6px; padding: 10px; margin-bottom: 8px;">
                     <p style="margin: 0; color: #ff8080; font-size: 0.85rem; font-weight: 600;">🚨 CRITICAL THREAT DETECTED</p>
                     <p style="margin: 4px 0 0 0; color: #f8fafc; font-size: 0.85rem;">IP: <b>{row['IP']}</b><br>Type: <b>{row['Threat']}</b><br>Confidence: <b>{row['Confidence']:.1f}%</b></p>
@@ -1222,7 +1222,7 @@ with st.expander(f"🔍 View VirusTotal / AbuseIPDB Reputation Report ({selected
     col_ti1, col_ti2 = st.columns(2)
     with col_ti1:
         st.write(f"**Target Analyzed IP:** `{selected_vt_ip}`")
-        st.markdown(f"""
+                st.markdown(f"""
             - **Community Reputation:** Malicious (Confidence: {vt_confidence}%)
             - **Associated Malware Families:** {malware_families}
             - **Last Reported Activity:** Today, 12:04 UTC
