@@ -990,15 +990,15 @@ with st.sidebar.expander("🛡️ Incident Response (SOAR)", expanded=False):
             handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated (User: {st.session_state.get('username', 'Unknown')})")
             st.session_state.cleared_ips.add(target_ip)
             st.rerun()
-if "cleared_ips" not in st.session_state:
-    st.session_state.cleared_ips = set()
+    if "cleared_ips" not in st.session_state:
+        st.session_state.cleared_ips = set()
 
-    with st.spinner(f"Pushing rule to iptables for {target_ip}..."):
-        time.sleep(1.0)
-    handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated (User: {st.session_state['username']})")
-    st.session_state.cleared_ips.add(target_ip)
-    st.success(f"Successfully isolated host {target_ip}!")
-    st.rerun()
+    if st.button("Block IP & Push Firewall Rule", type="primary") and target_ip != "N/A":
+        with st.spinner(f"Pushing rule to iptables for {target_ip}..."):
+            time.sleep(1.0)
+        handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated (User: {st.session_state.get('username', 'Unknown')})")
+        st.session_state.cleared_ips.add(target_ip)
+        st.rerun()
 
 if user_role == 'admin':
     st.sidebar.markdown("---")
