@@ -985,6 +985,17 @@ if st.button("üö® Block IP & Push Firewall Rule", type="primary") and target_ip
     st.rerun()
 
 if user_role == 'admin':
+    cleared_list = sorted(list(st.session_state.get("cleared_ips", set())))
+    with st.expander("?? Cleared / Isolated IP Records (Admin)", expanded=False):
+        if cleared_list:
+            for ip in cleared_list:
+                st.write(f"ï `{ip}` ó Cleared via SOAR")
+            if st.button("Restore Cleared Alerts"):
+                st.session_state.cleared_ips.clear()
+                st.rerun()
+        else:
+            st.caption("No IP alerts have been cleared yet.")
+
     st.sidebar.markdown("---")
     st.sidebar.markdown("### üõ†Ô∏è Operations & Reports")
 
@@ -1222,6 +1233,17 @@ st.divider()
 
 # --- ADMIN-ONLY REGISTERED USER ACCOUNTS & LOGIN STATISTICS TABLE ---
 if user_role == 'admin':
+    cleared_list = sorted(list(st.session_state.get("cleared_ips", set())))
+    with st.expander("?? Cleared / Isolated IP Records (Admin)", expanded=False):
+        if cleared_list:
+            for ip in cleared_list:
+                st.write(f"ï `{ip}` ó Cleared via SOAR")
+            if st.button("Restore Cleared Alerts"):
+                st.session_state.cleared_ips.clear()
+                st.rerun()
+        else:
+            st.caption("No IP alerts have been cleared yet.")
+
     st.subheader("üë• Registered User Accounts & Login Statistics")
     users_df = get_all_user_accounts()
     st.dataframe(users_df, use_container_width=True)
