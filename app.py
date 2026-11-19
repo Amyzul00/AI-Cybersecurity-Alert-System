@@ -940,7 +940,7 @@ if st.sidebar.button("🔄 Refresh & Rescan", use_container_width=True, key="sid
 st.sidebar.markdown("---")
 
 with st.sidebar.expander("🚨 Alert & Notification Center", expanded=False):
-    critical_alerts = df[df["Status"] == "CRITICAL"] if 'df' in locals() and not df.empty else pd.DataFrame()
+    critical_alerts = df[(df["Status"] == "CRITICAL") & (~df["IP"].isin(st.session_state.get("cleared_ips", set())))] if 'df' in locals() and not df.empty else pd.DataFrame()
     
     if not critical_alerts.empty:
         for idx, row in critical_alerts.iterrows():
@@ -973,11 +973,16 @@ with st.sidebar.expander("🛡️ Incident Response (SOAR)", expanded=False):
         "Select Host IP to Isolate:",
         options=filtered_df["IP"].unique() if not filtered_df.empty else ["N/A"],
     )
-    if st.button("🚨 Block IP & Push Firewall Rule", type="primary") and target_ip != "N/A":
-        with st.spinner(f"Pushing rule to iptables for {target_ip}..."):
-            time.sleep(1.0)
-        handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated (User: {st.session_state['username']}).", is_critical=True)
-        st.success(f"Successfully isolated host {target_ip}!")
+if "cleared_ips" not in st.session_state:
+    st.session_state.cleared_ips = set()
+
+if st.button("🚨 Block IP & Push Firewall Rule", type="primary") and target_ip != "N/A":
+    with st.spinner(f"Pushing rule to iptables for {target_ip}..."):
+        time.sleep(1.0)
+    handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated (User: {st.session_state['username']})")
+    st.session_state.cleared_ips.add(target_ip)
+    st.success(f"Successfully isolated host {target_ip}!")
+    st.rerun()
 
 if user_role == 'admin':
     st.sidebar.markdown("---")
