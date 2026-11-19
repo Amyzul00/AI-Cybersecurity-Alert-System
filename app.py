@@ -976,7 +976,7 @@ with st.sidebar.expander("🛡️ Incident Response (SOAR)", expanded=False):
     if "cleared_ips" not in st.session_state:
         st.session_state.cleared_ips = set()
 
-    if st.button("Block IP & Push Firewall Rule", type="primary") and target_ip != "N/A":
+    if st.button("Block IP & Push Firewall Rule", type="primary", key="soar_block_ip_btn") and target_ip != "N/A":
         with st.spinner(f"Pushing rule to iptables for {target_ip}..."):
             time.sleep(1.0)
         handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated (User: {st.session_state.get('username', 'Unknown')})")
@@ -984,7 +984,7 @@ with st.sidebar.expander("🛡️ Incident Response (SOAR)", expanded=False):
         st.rerun()
         st.session_state.cleared_ips = set()
 
-        if st.button("Block IP & Push Firewall Rule", type="primary") and target_ip != "N/A":
+        if st.button("Block IP & Push Firewall Rule", type="primary", key="soar_block_ip_btn_2") and target_ip != "N/A":
             with st.spinner(f"Pushing rule to iptables for {target_ip}..."):
                 time.sleep(1.0)
             handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated (User: {st.session_state.get('username', 'Unknown')})")
@@ -993,7 +993,7 @@ with st.sidebar.expander("🛡️ Incident Response (SOAR)", expanded=False):
     if "cleared_ips" not in st.session_state:
         st.session_state.cleared_ips = set()
 
-    if st.button("Block IP & Push Firewall Rule", type="primary") and target_ip != "N/A":
+    if st.button("Block IP & Push Firewall Rule", type="primary", key="soar_block_ip_btn_3") and target_ip != "N/A":
         with st.spinner(f"Pushing rule to iptables for {target_ip}..."):
             time.sleep(1.0)
         handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated (User: {st.session_state.get('username', 'Unknown')})")
