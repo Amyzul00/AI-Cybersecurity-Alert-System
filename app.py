@@ -989,7 +989,7 @@ with st.sidebar.expander("🚨 Alert & Notification Center", expanded=False):
         st.session_state.cleared_ips = set(load_cleared_ips().keys())
         if st.session_state.get("clear_notice"):
             st.success(st.session_state.clear_notice)
-    critical_alerts = df[(df["Status"] == "CRITICAL") & (~df["IP"].isin(st.session_state.get("cleared_ips", set())))] if 'df' in locals() and not df.empty else pd.DataFrame()
+        critical_alerts = df[(df["Status"] == "CRITICAL") & (~df["IP"].isin(st.session_state.get("cleared_ips", set())))] if 'df' in locals() and not df.empty else []
     
     if not critical_alerts.empty:
         for idx, row in critical_alerts.iterrows():
