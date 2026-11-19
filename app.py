@@ -1,13 +1,47 @@
-﻿# =====================================================================
-# TEMPORAL VALIDITY LSTM & MODEL SPECIFICATION PANEL
-# =====================================================================
-def render_warisan_lstm_specs():
-    import pandas as pd
-    import streamlit as st
+﻿from database import (
+    get_db_connection,
+    init_db,
+    log_threat,
+    fetch_recent_threats,
+    register_user,
+    get_all_registered_users,
+    increment_user_login,
+    get_all_user_accounts,
+    update_user_password,
+)
+import threat_detector
+import base64
+from datetime import datetime
+from io import BytesIO
 import json
 from pathlib import Path
+import os
+import random
+import smtplib
+import time
+import jwt
+import logging
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
+from PIL import Image
+import pandas as pd
+import plotly.express as px
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.platypus import (
+    Image as RLImage,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
+import streamlit as st
 
 CLEARED_IPS_FILE = Path("cleared_ips.json")
+
 
 def load_cleared_ips():
     if CLEARED_IPS_FILE.exists():
@@ -19,14 +53,22 @@ def load_cleared_ips():
             pass
     return {}
 
+
 def save_cleared_ip(ip, cleared_by):
     records = load_cleared_ips()
     records[ip] = cleared_by
     CLEARED_IPS_FILE.write_text(json.dumps(records, indent=2), encoding="utf-8")
 
+
 def clear_all_saved_ips():
     if CLEARED_IPS_FILE.exists():
         CLEARED_IPS_FILE.unlink()
+
+
+# =====================================================================
+# TEMPORAL VALIDITY LSTM & MODEL SPECIFICATION PANEL
+# =====================================================================
+def render_warisan_lstm_specs():
     with st.expander("🧠 Temporal Validity LSTM & Model Specification (DeepLSTM Architecture)", expanded=True):
         tab_temp, tab_spec = st.tabs([
             "⏱️ Temporal Validity (Sequence & Windowing)",
@@ -42,12 +84,12 @@ def clear_all_saved_ips():
 
             st.markdown(r"""
             **1. Sequence Algorithm (Terminal-Step Sliding Window Formulation):**
-            * Raw packet-flow records (`221,264` cleaned rows) are ordered chronologically by timestamp (`Timestamp` / `Flow Start Time`) prior to partitioning.
-            * For every index $i$, the algorithm constructs a 3D input sequence tensor $X_i = \text{features}[i : i + 100]$ of shape `(100, 5)` and assigns the target class label from the terminal step $y_i = \text{labels}[i + 100]$.
+- Raw packet-flow records (`221,264` cleaned rows) are ordered chronologically by timestamp (`Timestamp` / `Flow Start Time`) prior to partitioning.
+- For every index $i$, the algorithm constructs a 3D input sequence tensor $X_i = \text{features}[i : i + 100]$ of shape `(100, 5)` and assigns the target class label from the terminal step $y_i = \text{labels}[i + 100]$.
 
             **2. Window Length Across Training & Testing (`SEQ_LEN = 100`):**
-            * **Training Window Length:** $W_{\text{train}} = 100$ consecutive flows (`X_train_seq` constructed strictly from the 80% training partition after `StandardScaler` and `RandomOverSampler(random_state=42)`).
-            * **Testing Window Length:** $W_{\text{test}} = 100$ consecutive flows (`X_test_seq` constructed independently on the isolated 20% test partition using training scaler parameters, preventing cross-boundary window leakage).
+- **Training Window Length:** $W_{\text{train}} = 100$ consecutive flows (`X_train_seq` constructed strictly from the 80% training partition after `StandardScaler` and `RandomOverSampler(random_state=42)`).
+- **Testing Window Length:** $W_{\text{test}} = 100$ consecutive flows (`X_test_seq` constructed independently on the isolated 20% test partition using training scaler parameters, preventing cross-boundary window leakage).
             """)
 
         with tab_spec:
@@ -116,68 +158,7 @@ def clear_all_saved_ips():
                 }
             ])
             st.dataframe(arch_df, use_container_width=True, hide_index=True)
-from database import (
-    get_db_connection,
-    init_db,
-    log_threat,
-    fetch_recent_threats,
-    register_user,
-    get_all_registered_users,
-    increment_user_login,
-    get_all_user_accounts,
-    update_user_password,
-)
-import threat_detector
-import base64
-from datetime import datetime
-from io import BytesIO
-import os
-import random
-import smtplib
-import time
-import jwt
-import logging
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.application import MIMEApplication
-from PIL import Image
-import pandas as pd
-import plotly.express as px
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.platypus import (
-    Image as RLImage,
-    Paragraph,
-    SimpleDocTemplate,
-    Spacer,
-    Table,
-    TableStyle,
-)
-import streamlit as st
-import json
-from pathlib import Path
 
-CLEARED_IPS_FILE = Path("cleared_ips.json")
-
-def load_cleared_ips():
-    if CLEARED_IPS_FILE.exists():
-        try:
-            data = json.loads(CLEARED_IPS_FILE.read_text(encoding="utf-8"))
-            if isinstance(data, dict):
-                return data
-        except Exception:
-            pass
-    return {}
-
-def save_cleared_ip(ip, cleared_by):
-    records = load_cleared_ips()
-    records[ip] = cleared_by
-    CLEARED_IPS_FILE.write_text(json.dumps(records, indent=2), encoding="utf-8")
-
-def clear_all_saved_ips():
-    if CLEARED_IPS_FILE.exists():
-        CLEARED_IPS_FILE.unlink()
 
 # Initialize Database Schema
 init_db()
@@ -197,9 +178,10 @@ logger = logging.getLogger("ThreatDetection")
 SECRET_KEY = "warisan-security-super-secret-key-change-in-production"
 ALGORITHM = "HS256"
 
+
 def verify_websocket_token(token: str):
     """
-    Cryptographically verify incoming WebSocket connection tokens 
+    Cryptographically verify incoming WebSocket connection tokens
     against the server's SECRET_KEY and specified ALGORITHM.
     Enforces mandatory claim validation ('sub' and 'role').
     """
@@ -217,6 +199,7 @@ def verify_websocket_token(token: str):
 
     except jwt.InvalidTokenError:
         return None
+
 
 # --- GLOBAL SESSION STATE INITIALIZATION ---
 if "user_email" not in st.session_state:
@@ -260,7 +243,7 @@ st.markdown('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs
 
 # --- HIDE TOP-RIGHT TOOLBAR BUTTONS & CONDITIONAL TOP PROGRESS BAR ---
 if not st.session_state["logged_in"]:
-                st.markdown("""
+    st.markdown("""
         <style>
         [data-testid="stToolbar"] > div:not(:last-child) {
             display: none !important;
@@ -275,7 +258,7 @@ if not st.session_state["logged_in"]:
         </style>
     """, unsafe_allow_html=True)
 else:
-                st.markdown("""
+    st.markdown("""
         <style>
         [data-testid="stToolbar"] > div:not(:last-child) {
             display: none !important;
@@ -284,7 +267,7 @@ else:
     """, unsafe_allow_html=True)
 
 # --- ELITE SOC AUTH & GLOBAL STYLING ---
-                st.markdown("""
+st.markdown("""
     <style>
     .block-container {
         padding-top: 2rem !important;
@@ -325,6 +308,7 @@ else:
     </style>
 """, unsafe_allow_html=True)
 
+
 # ==========================================
 # HELPER: BASE64 IMAGE ENCODING
 # ==========================================
@@ -338,7 +322,9 @@ def get_base64_image(image_filename="Logo.png"):
     except Exception:
         return ""
 
+
 logo_base64 = get_base64_image("Logo.png")
+
 
 # ==========================================
 # PASSWORD VERIFICATION HELPER
@@ -346,13 +332,14 @@ logo_base64 = get_base64_image("Logo.png")
 def verify_password(plain_password, stored_password):
     return plain_password == stored_password
 
+
 # ==========================================
 # AUTOMATED EMAIL & ALERT FUNCTIONS (GMAIL SAFE)
 # ==========================================
 def auto_send_lstm_threat_alert(threat_label, confidence_score=95.8, target_ip="192.168.1.96"):
     recipient_emails = get_all_registered_users()
     recipient_emails = list(set([e.lower().strip() for e in recipient_emails if e and "@" in e]))
-    
+
     if not recipient_emails:
         return 0
 
@@ -386,7 +373,7 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=95.8, target_ip="
                 <h2 class="title">Warisan AI-Based Threat Detection & Real-time Alert System</h2>
                 <p class="subtitle">Deep LSTM Threat Intelligence & Incident Operations</p>
             </div>
-            
+
             <div class="alert-card">
                 <div class="alert-header">🚨 CRITICAL THREAT DETECTED</div>
                 <div class="alert-row">IP Address: &nbsp;<b>{target_ip}</b></div>
@@ -431,13 +418,15 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=95.8, target_ip="
 
     return sent_count
 
+
 def send_security_alert_to_all(src_ip, threat_type):
     return auto_send_lstm_threat_alert(threat_type)
+
 
 def send_welcome_email(recipient_email, username):
     SENDER_EMAIL = "warisansecurityalerts@gmail.com"
     SENDER_PASSWORD = "zjmm vunm ngec wkvu"
-    
+
     subject = "🛡️ [WARISAN SOC] Account Successfully Registered"
 
     html_body = f"""
@@ -484,13 +473,13 @@ def send_welcome_email(recipient_email, username):
         server = smtplib.SMTP("smtp.gmail.com", 587)
         server.starttls()
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
-        
+
         msg = MIMEMultipart("alternative")
         msg["From"] = SENDER_EMAIL
         msg["To"] = recipient_email
         msg["Subject"] = subject
         msg.attach(MIMEText(html_body, "html"))
-        
+
         server.sendmail(SENDER_EMAIL, recipient_email, msg.as_string())
         server.quit()
         return True
@@ -498,16 +487,17 @@ def send_welcome_email(recipient_email, username):
         print(f"[-] Failed to send welcome email: {e}")
         return False
 
+
 def send_password_reset_email(recipient_email, reset_code):
     SENDER_EMAIL = "warisansecurityalerts@gmail.com"
     SENDER_PASSWORD = "zjmm vunm ngec wkvu"
-    
+
     subject = "🔑 [WARISAN SOC] Password Reset Verification Code"
     body = f"""
     Hello,
 
     We received a request to reset your password for the Warisan AI-Based Threat Detection & Real-time Alert System Portal.
-    
+
     Your Password Reset Verification Code is: {reset_code}
 
     If you did not request this password reset, please ignore this email or contact the administrator.
@@ -519,13 +509,13 @@ def send_password_reset_email(recipient_email, reset_code):
         server = smtplib.SMTP("smtp.gmail.com", 587)
         server.starttls()
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
-        
+
         msg = MIMEMultipart()
         msg["From"] = SENDER_EMAIL
         msg["To"] = recipient_email
         msg["Subject"] = subject
         msg.attach(MIMEText(body, "plain"))
-        
+
         server.sendmail(SENDER_EMAIL, recipient_email, msg.as_string())
         server.quit()
         return True
@@ -533,8 +523,10 @@ def send_password_reset_email(recipient_email, reset_code):
         print(f"[-] Failed to send password reset email: {e}")
         return False
 
+
 def handle_security_event(message, is_critical=True):
     print(f"[SOAR] {message}")
+
 
 # ==========================================
 # VIEW 1: MODERN SOC CARD AUTHENTICATION
@@ -544,7 +536,7 @@ if not st.session_state["logged_in"]:
 
     col1, col2, col3 = st.columns([1, 1.35, 1])
     with col2:
-                st.markdown(f"""
+        st.markdown(f"""
             <div style="text-align: center; margin-bottom: 20px;">
                 {logo_html}
                 <h2 style="color: #ffffff; margin: 0; font-size: 1.4rem; font-weight: 700; letter-spacing: -0.5px; line-height: 1.3;">Warisan AI-Based Threat Detection & Real-time Alert System</h2>
@@ -553,21 +545,21 @@ if not st.session_state["logged_in"]:
         """, unsafe_allow_html=True)
 
         if st.session_state["otp_required"]:
-                st.markdown(f"""
+            st.markdown(f"""
                 <div style="background-color: #0e1626; border: 1px solid #1e293b; border-radius: 10px; padding: 16px; margin-bottom: 16px;">
                     <p style="margin: 0 0 6px 0; color: #94a3b8; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">🔒 Security Verification (2FA)</p>
                     <p style="margin: 0; color: #f8fafc; font-size: 0.95rem;">A verification code has been dispatched to: <b>{st.session_state['temp_email']}</b></p>
                 </div>
             """, unsafe_allow_html=True)
-            
-                st.markdown(f"""
+
+            st.markdown(f"""
                 <div style="background-color: rgba(255, 75, 75, 0.08); border: 1px solid rgba(255, 75, 75, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
                     <p style="margin: 0; color: #ff8080; font-size: 0.88rem; font-weight: 500;">🔑 <b>Secure Authentication Key:</b> <code style="background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 4px; color: #fff;">{st.session_state['generated_otp']}</code></p>
                 </div>
             """, unsafe_allow_html=True)
-            
+
             entered_otp = st.text_input("Enter 6-Digit Verification Code", type="password", key="otp_input")
-            
+
             c_otp1, c_otp2 = st.columns(2)
             with c_otp1:
                 if st.button("Verify & Sign In", use_container_width=True, type="primary"):
@@ -577,12 +569,12 @@ if not st.session_state["logged_in"]:
                         st.session_state["role"] = st.session_state["temp_role"]
                         st.session_state["email"] = st.session_state["temp_email"]
                         st.session_state["user_email"] = st.session_state["temp_email"]
-                        
+
                         if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
                             st.session_state.role = "admin"
-                        
+
                         increment_user_login(st.session_state["temp_email"])
-                        
+
                         st.session_state["otp_required"] = False
                         st.session_state["generated_otp"] = ""
                         st.rerun()
@@ -610,7 +602,7 @@ if not st.session_state["logged_in"]:
                 st.subheader("System Login (2FA Security)")
                 username_input = st.text_input("Username or Email", key="login_username")
                 password = st.text_input("Password", type="password", key="login_password")
-                
+
                 col_fp1, col_fp2 = st.columns([1, 1])
                 with col_fp1:
                     if st.button("Forgot Password?", key="forgot_pass_link", help="Click to reset your password"):
@@ -628,11 +620,11 @@ if not st.session_state["logged_in"]:
                             user_record = cursor.fetchone()
                             cursor.close()
                             conn.close()
-                            
+
                             if user_record and verify_password(password, user_record['password']):
                                 user_email = user_record['email'] if user_record['email'] else "warisansecurityalerts@gmail.com"
                                 otp_code = str(random.randint(100000, 999999))
-                                
+
                                 st.session_state["generated_otp"] = otp_code
                                 st.session_state["temp_username"] = user_record['username']
                                 st.session_state["temp_role"] = str(user_record['role']).upper()
@@ -652,7 +644,7 @@ if not st.session_state["logged_in"]:
                 reg_email = st.text_input("Email Address (For Notifications & OTP)", key="reg_email")
                 reg_pass = st.text_input("Choose Password", type="password", key="reg_password")
                 reg_confirm_pass = st.text_input("Confirm Password", type="password", key="reg_confirm_password")
-                
+
                 st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
                 if st.button("Register Account", use_container_width=True, type="primary"):
                     if reg_user and reg_email and reg_pass and reg_confirm_pass:
@@ -661,7 +653,7 @@ if not st.session_state["logged_in"]:
                             if success:
                                 with st.spinner("Sending confirmation email..."):
                                     email_sent = send_welcome_email(reg_email, reg_user)
-                                
+
                                 if email_sent:
                                     st.success("Account successfully registered & confirmation email sent! Redirecting...")
                                 else:
@@ -680,7 +672,7 @@ if not st.session_state["logged_in"]:
                 if st.session_state["forgot_step"] == 1:
                     st.subheader("Account Recovery")
                     reset_email_input = st.text_input("Enter your registered email address", key="reset_email")
-                    
+
                     if st.button("Send Verification Code", use_container_width=True, type="primary"):
                         if reset_email_input:
                             try:
@@ -690,15 +682,15 @@ if not st.session_state["logged_in"]:
                                 record = cursor.fetchone()
                                 cursor.close()
                                 conn.close()
-                                
+
                                 if record:
                                     code = str(random.randint(100000, 999999))
                                     st.session_state["forgot_code"] = code
                                     st.session_state["forgot_email"] = reset_email_input.strip().lower()
-                                    
+
                                     with st.spinner("Sending verification code to email..."):
                                         sent = send_password_reset_email(st.session_state["forgot_email"], code)
-                                    
+
                                     if sent:
                                         st.session_state["forgot_step"] = 2
                                         st.success("Verification code sent to your email!")
@@ -716,11 +708,11 @@ if not st.session_state["logged_in"]:
                 elif st.session_state["forgot_step"] == 2:
                     st.info(f"🔑 Verification code sent to: **{st.session_state['forgot_email']}**")
                     st.warning(f"💡 **[DEBUG BYPASS] Reset Code:** `{st.session_state['forgot_code']}`")
-                    
+
                     entered_reset_code = st.text_input("Enter 6-Digit Verification Code", key="entered_r_code")
                     new_password_input = st.text_input("Enter New Password", type="password", key="new_pword")
                     new_confirm_password_input = st.text_input("Confirm New Password", type="password", key="new_cpword")
-                    
+
                     c_f1, c_f2 = st.columns(2)
                     with c_f1:
                         if st.button("Update Password", use_container_width=True, type="primary"):
@@ -749,7 +741,7 @@ if not st.session_state["logged_in"]:
 
         footer_logo_html = f'<img src="{logo_base64}" style="width: 16px; height: 16px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 6px;" alt="Logo">' if logo_base64 else '🛡️'
 
-                st.markdown(f"""
+        st.markdown(f"""
             <div style="text-align: center; margin-top: 24px; font-size: 0.78rem; color: #64748b;">
                 {footer_logo_html} Warisan AI-Based Threat Detection & Real-time Alert System — Secure 2FA Environment
             </div>
@@ -769,7 +761,7 @@ if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
     user_role = "admin"
 
 if logo_base64:
-                st.markdown(f"""
+    st.markdown(f"""
         <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 20px;">
             <img src="{logo_base64}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 4px 10px rgba(0,0,0,0.5);" alt="Logo">
             <div>
@@ -782,12 +774,15 @@ else:
     st.title("Warisan AI-Based Threat Detection & Real-time Alert System")
     st.caption("AI-Based Threat Detection & Real-time Alert System")
 
+
 @st.cache_resource
 def load_detection_engine():
     return True
 
+
 if load_detection_engine():
     st.success("✅ Successfully connected to backend threat engine, LSTM model, and SOAR framework.")
+
 
 @st.cache_data
 def get_backend_predictions():
@@ -817,7 +812,9 @@ def get_backend_predictions():
         ]
     return pd.DataFrame(formatted_data)
 
+
 df = get_backend_predictions()
+
 
 @st.cache_data
 def get_xai_feature_importances():
@@ -832,6 +829,7 @@ def get_xai_feature_importances():
         "Importance_Score": [28.4, 22.1, 18.5, 14.2, 10.3],
     }
     return pd.DataFrame(xai_data)
+
 
 # ==========================================
 # ENTERPRISE PDF REPORT GENERATION UTILITY
@@ -946,13 +944,14 @@ def generate_pdf_report(dataframe):
     elements.append(t)
     doc.build(elements)
     buffer.seek(0)
-    
+
     pdf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "executive_threat_report.pdf")
     with open(pdf_path, "wb") as f_out:
         f_out.write(buffer.getvalue())
     buffer.seek(0)
-    
+
     return buffer
+
 
 # ==========================================
 # SIDEBAR (ORGANIZED & ROLE-RESTRICTED)
@@ -961,7 +960,7 @@ if logo_base64:
     st.sidebar.markdown(f'<div style="text-align: center; margin-bottom: 12px;"><img src="{logo_base64}" style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 0 12px rgba(255,75,75,0.6);"></div>', unsafe_allow_html=True)
 
 with st.sidebar.expander("👤 User Profile & Session", expanded=True):
-                st.markdown(f"""
+    st.markdown(f"""
         <div style="background-color: #0d2318; border: 1px solid #1e4630; border-radius: 8px; padding: 10px; margin-bottom: 10px;">
             <p style="margin: 0; color: #4cd137; font-size: 0.9rem;">👤 User: <b>{st.session_state['username']}</b></p>
             <p style="margin: 4px 0 0 0; color: #fbc531; font-size: 0.9rem;">🔑 Role: <b>{st.session_state['role'].upper()}</b></p>
@@ -986,14 +985,14 @@ if st.sidebar.button("🔄 Refresh & Rescan", use_container_width=True, key="sid
 st.sidebar.markdown("---")
 
 with st.sidebar.expander("🚨 Alert & Notification Center", expanded=False):
-        st.session_state.cleared_ips = set(load_cleared_ips().keys())
-        if st.session_state.get("clear_notice"):
-            st.success(st.session_state.clear_notice)
-        critical_alerts = df[(df["Status"] == "CRITICAL") & (~df["IP"].isin(st.session_state.get("cleared_ips", set())))] if 'df' in locals() and not df.empty else []
-    
-        if len(critical_alerts) > 0:
-            for idx, row in critical_alerts.iterrows():
-                st.markdown(f"""
+    st.session_state.cleared_ips = set(load_cleared_ips().keys())
+    if st.session_state.get("clear_notice"):
+        st.success(st.session_state.clear_notice)
+    critical_alerts = df[(df["Status"] == "CRITICAL") & (~df["IP"].isin(st.session_state.get("cleared_ips", set())))] if 'df' in locals() and not df.empty else []
+
+    if len(critical_alerts) > 0:
+        for idx, row in critical_alerts.iterrows():
+            st.markdown(f"""
                 <div style="background-color: rgba(255, 75, 75, 0.12); border: 1px solid rgba(255, 75, 75, 0.35); border-radius: 6px; padding: 10px; margin-bottom: 8px;">
                     <p style="margin: 0; color: #ff8080; font-size: 0.85rem; font-weight: 600;">🚨 CRITICAL THREAT DETECTED</p>
                     <p style="margin: 4px 0 0 0; color: #f8fafc; font-size: 0.85rem;">IP: <b>{row['IP']}</b><br>Type: <b>{row['Threat']}</b><br>Confidence: <b>{row['Confidence']:.1f}%</b></p>
@@ -1034,8 +1033,6 @@ with st.sidebar.expander("🛡️ Incident Response (SOAR)", expanded=False):
         st.session_state.cleared_ips = set(load_cleared_ips().keys())
         st.session_state.clear_notice = f"Successfully cleared & isolated {target_ip} (Action by: {actor})."
         st.rerun()
-    if "cleared_ips" not in st.session_state:
-        st.session_state.cleared_ips = set()
 
 if user_role == 'admin':
     st.sidebar.markdown("---")
@@ -1044,7 +1041,7 @@ if user_role == 'admin':
     if st.sidebar.button("📧 Email PDF Report to All Users", use_container_width=True):
         try:
             recipient_emails = get_all_registered_users()
-            
+
             if not recipient_emails:
                 st.warning("No registered user emails found in the database.")
             else:
@@ -1052,35 +1049,35 @@ if user_role == 'admin':
                 app_password = "zjmm vunm ngec wkvu"
                 success_count = 0
                 pdf_filename = "executive_threat_report.pdf"
-                
+
                 for recipient in recipient_emails:
                     try:
                         msg = MIMEMultipart()
                         msg['From'] = sender_email
                         msg['To'] = recipient
                         msg['Subject'] = "[WARISAN SOC] Executive AI Threat Detection & Real-time Alert Report"
-                        
+
                         body = "Attached is the latest automated executive threat intelligence report generated by Warisan AI-Based Threat Detection & Real-time Alert System."
                         msg.attach(MIMEText(body, 'plain'))
-                        
+
                         pdf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), pdf_filename)
                         with open(pdf_path, "rb") as f:
                             attach = MIMEApplication(f.read(), Name=pdf_filename)
                             attach['Content-Disposition'] = f'attachment; filename="{pdf_filename}"'
                             msg.attach(attach)
-                        
+
                         server = smtplib.SMTP('smtp.gmail.com', 587)
                         server.starttls()
                         server.login(sender_email, app_password)
                         server.sendmail(sender_email, recipient, msg.as_string())
                         server.quit()
-                        
+
                         success_count += 1
                     except Exception as inner_e:
                         print(f"[-] Failed to send email to {recipient}: {inner_e}")
-                
+
                 st.success(f"Successfully broadcasted report to {success_count} out of {len(recipient_emails)} registered user(s)!")
-                
+
         except Exception as e:
             st.error(f"Broadcast failed: {e}")
 
@@ -1222,16 +1219,16 @@ with st.expander(f"🔍 View VirusTotal / AbuseIPDB Reputation Report ({selected
     col_ti1, col_ti2 = st.columns(2)
     with col_ti1:
         st.write(f"**Target Analyzed IP:** `{selected_vt_ip}`")
-                st.markdown(f"""
-            - **Community Reputation:** Malicious (Confidence: {vt_confidence}%)
-            - **Associated Malware Families:** {malware_families}
-            - **Last Reported Activity:** Today, 12:04 UTC
+        st.markdown(f"""
+- **Community Reputation:** Malicious (Confidence: {vt_confidence}%)
+- **Associated Malware Families:** {malware_families}
+- **Last Reported Activity:** Today, 12:04 UTC
             """)
     with col_ti2:
         st.markdown(f"""
-            - **Vendor Engine Detections:** {vt_detections} / 92 security vendors flagged this IP
-            - **Geolocation:** {geo_location}
-            - **Automated Mitigation Status:** Ready for Firewall Isolation
+- **Vendor Engine Detections:** {vt_detections} / 92 security vendors flagged this IP
+- **Geolocation:** {geo_location}
+- **Automated Mitigation Status:** Ready for Firewall Isolation
             """)
 
 st.divider()
@@ -1304,7 +1301,7 @@ if predicted_class.lower() != "normal":
     if st.session_state.last_alerted_threat != predicted_class:
         with st.spinner("Auto-broadcasting threat alert to all registered users..."):
             sent_count = auto_send_lstm_threat_alert(predicted_class, confidence)
-            
+
             if sent_count > 0:
                 st.toast(f"🚨 Threat alert auto-sent to {sent_count} user(s)!", icon="📧")
                 st.session_state.last_alerted_threat = predicted_class
