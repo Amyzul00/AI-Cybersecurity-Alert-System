@@ -780,11 +780,10 @@ def get_xai_feature_importances():
             "Flow Bytes/s",
             "Flow Packets/s",
             "Total Fwd Packets",
-            "Total Length of Fwd Packets",
             "Fwd Packet Length Max",
             "Total Backward Packets",
         ],
-        "Importance_Score": [28.4, 22.1, 18.5, 14.2, 10.3, 6.5],
+        "Importance_Score": [28.4, 22.1, 18.5, 14.2, 10.3],
     }
     return pd.DataFrame(xai_data)
 
