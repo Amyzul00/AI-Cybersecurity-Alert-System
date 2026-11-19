@@ -4,6 +4,29 @@
 def render_warisan_lstm_specs():
     import pandas as pd
     import streamlit as st
+import json
+from pathlib import Path
+
+CLEARED_IPS_FILE = Path("cleared_ips.json")
+
+def load_cleared_ips():
+    if CLEARED_IPS_FILE.exists():
+        try:
+            data = json.loads(CLEARED_IPS_FILE.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+    return {}
+
+def save_cleared_ip(ip, cleared_by):
+    records = load_cleared_ips()
+    records[ip] = cleared_by
+    CLEARED_IPS_FILE.write_text(json.dumps(records, indent=2), encoding="utf-8")
+
+def clear_all_saved_ips():
+    if CLEARED_IPS_FILE.exists():
+        CLEARED_IPS_FILE.unlink()
     with st.expander("🧠 Temporal Validity LSTM & Model Specification (DeepLSTM Architecture)", expanded=True):
         tab_temp, tab_spec = st.tabs([
             "⏱️ Temporal Validity (Sequence & Windowing)",
@@ -132,6 +155,29 @@ from reportlab.platypus import (
     TableStyle,
 )
 import streamlit as st
+import json
+from pathlib import Path
+
+CLEARED_IPS_FILE = Path("cleared_ips.json")
+
+def load_cleared_ips():
+    if CLEARED_IPS_FILE.exists():
+        try:
+            data = json.loads(CLEARED_IPS_FILE.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+    return {}
+
+def save_cleared_ip(ip, cleared_by):
+    records = load_cleared_ips()
+    records[ip] = cleared_by
+    CLEARED_IPS_FILE.write_text(json.dumps(records, indent=2), encoding="utf-8")
+
+def clear_all_saved_ips():
+    if CLEARED_IPS_FILE.exists():
+        CLEARED_IPS_FILE.unlink()
 
 # Initialize Database Schema
 init_db()
@@ -940,6 +986,9 @@ if st.sidebar.button("🔄 Refresh & Rescan", use_container_width=True, key="sid
 st.sidebar.markdown("---")
 
 with st.sidebar.expander("🚨 Alert & Notification Center", expanded=False):
+        st.session_state.cleared_ips = set(load_cleared_ips().keys())
+        if st.session_state.get("clear_notice"):
+            st.success(st.session_state.clear_notice)
     critical_alerts = df[(df["Status"] == "CRITICAL") & (~df["IP"].isin(st.session_state.get("cleared_ips", set())))] if 'df' in locals() and not df.empty else pd.DataFrame()
     
     if not critical_alerts.empty:
@@ -977,13 +1026,14 @@ with st.sidebar.expander("🛡️ Incident Response (SOAR)", expanded=False):
         st.session_state.cleared_ips = set()
 
     if st.button("Block IP & Push Firewall Rule", type="primary", key="soar_block_ip_btn") and target_ip != "N/A":
+        actor = st.session_state.get('username', 'Unknown')
         with st.spinner(f"Pushing rule to iptables for {target_ip}..."):
             time.sleep(1.0)
-        handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated (User: {st.session_state.get('username', 'Unknown')})")
-        st.session_state.cleared_ips.add(target_ip)
+        handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated and alert cleared (By: {actor})")
+        save_cleared_ip(target_ip, actor)
+        st.session_state.cleared_ips = set(load_cleared_ips().keys())
+        st.session_state.clear_notice = f"Successfully cleared & isolated {target_ip} (Action by: {actor})."
         st.rerun()
-        st.session_state.cleared_ips = set()
-
     if "cleared_ips" not in st.session_state:
         st.session_state.cleared_ips = set()
 
@@ -1225,13 +1275,16 @@ st.divider()
 
 # --- ADMIN-ONLY REGISTERED USER ACCOUNTS & LOGIN STATISTICS TABLE ---
 if user_role == 'admin':
-    cleared_list = sorted(list(st.session_state.get("cleared_ips", set())))
+    cleared_records = load_cleared_ips()
     with st.expander("Cleared / Isolated IP Records (Admin)", expanded=False):
-        if cleared_list:
-            for ip in cleared_list:
-                st.write(f"� `{ip}` � Cleared via SOAR")
-            if st.button("Restore Cleared Alerts"):
-                st.session_state.cleared_ips.clear()
+        if cleared_records:
+            st.success(f"{len(cleared_records)} IP alert(s) currently cleared and isolated across all users.")
+            for ip, actor in sorted(cleared_records.items()):
+                st.write(f"- `{ip}` — Cleared via SOAR by **{actor}**")
+            if st.button("Restore Cleared Alerts", key="admin_restore_alerts_btn"):
+                clear_all_saved_ips()
+                st.session_state.cleared_ips = set()
+                st.session_state.pop("clear_notice", None)
                 st.rerun()
         else:
             st.caption("No IP alerts have been cleared yet.")
