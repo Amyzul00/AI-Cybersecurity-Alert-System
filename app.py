@@ -1,4 +1,4 @@
-# =====================================================================
+ï»¿# =====================================================================
 # TEMPORAL VALIDITY LSTM & MODEL SPECIFICATION PANEL
 # =====================================================================
 def render_warisan_lstm_specs():
@@ -986,10 +986,10 @@ if st.button("ðŸš¨ Block IP & Push Firewall Rule", type="primary") and target_ip
 
 if user_role == 'admin':
     cleared_list = sorted(list(st.session_state.get("cleared_ips", set())))
-    with st.expander("?? Cleared / Isolated IP Records (Admin)", expanded=False):
+    with st.expander("Cleared / Isolated IP Records (Admin)", expanded=False):
         if cleared_list:
             for ip in cleared_list:
-                st.write(f"• `{ip}` — Cleared via SOAR")
+                st.write(f"ï¿½ `{ip}` ï¿½ Cleared via SOAR")
             if st.button("Restore Cleared Alerts"):
                 st.session_state.cleared_ips.clear()
                 st.rerun()
@@ -1234,10 +1234,10 @@ st.divider()
 # --- ADMIN-ONLY REGISTERED USER ACCOUNTS & LOGIN STATISTICS TABLE ---
 if user_role == 'admin':
     cleared_list = sorted(list(st.session_state.get("cleared_ips", set())))
-    with st.expander("?? Cleared / Isolated IP Records (Admin)", expanded=False):
+    with st.expander("Cleared / Isolated IP Records (Admin)", expanded=False):
         if cleared_list:
             for ip in cleared_list:
-                st.write(f"• `{ip}` — Cleared via SOAR")
+                st.write(f"ï¿½ `{ip}` ï¿½ Cleared via SOAR")
             if st.button("Restore Cleared Alerts"):
                 st.session_state.cleared_ips.clear()
                 st.rerun()
