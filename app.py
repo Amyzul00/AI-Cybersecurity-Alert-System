@@ -991,7 +991,7 @@ with st.sidebar.expander("🚨 Alert & Notification Center", expanded=False):
             st.success(st.session_state.clear_notice)
         critical_alerts = df[(df["Status"] == "CRITICAL") & (~df["IP"].isin(st.session_state.get("cleared_ips", set())))] if 'df' in locals() and not df.empty else []
     
-    if not critical_alerts.empty:
+        if len(critical_alerts) > 0:
         for idx, row in critical_alerts.iterrows():
             st.markdown(f"""
                 <div style="background-color: rgba(255, 75, 75, 0.12); border: 1px solid rgba(255, 75, 75, 0.35); border-radius: 6px; padding: 10px; margin-bottom: 8px;">
