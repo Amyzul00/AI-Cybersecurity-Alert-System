@@ -1201,11 +1201,29 @@ st.sidebar.markdown("---")
 with st.sidebar.expander("🚨 Alert & Notification Center", expanded=False):
     st.session_state.cleared_ips = set(load_cleared_ips().keys())
     if st.session_state.get("clear_notice"):
-        st.success(st.session_state.clear_notice)
-    critical_alerts = df[(df["Status"] == "CRITICAL") & (~df["IP"].isin(st.session_state.get("cleared_ips", set())))] if 'df' in locals() and not df.empty else []
+        if st.session_state.get("clear_notice_type") == "warning":
+            st.warning(st.session_state.clear_notice)
+        else:
+            st.success(st.session_state.clear_notice)
 
-    if len(critical_alerts) > 0:
-        for idx, row in critical_alerts.iterrows():
+    active_df = (
+        df[~df["IP"].isin(st.session_state.get("cleared_ips", set()))]
+        if "df" in locals() and not df.empty
+        else pd.DataFrame()
+    )
+    critical_alerts = (
+        active_df[active_df["Status"] == "CRITICAL"]
+        if not active_df.empty and "Status" in active_df.columns
+        else pd.DataFrame()
+    )
+    warning_reminders = (
+        active_df[active_df["Status"] == "WARNING"]
+        if not active_df.empty and "Status" in active_df.columns
+        else pd.DataFrame()
+    )
+
+    if not critical_alerts.empty:
+        for _, row in critical_alerts.iterrows():
             st.markdown(f"""
                 <div style="background-color: rgba(255, 75, 75, 0.12); border: 1px solid rgba(255, 75, 75, 0.35); border-radius: 6px; padding: 10px; margin-bottom: 8px;">
                     <p style="margin: 0; color: #ff8080; font-size: 0.85rem; font-weight: 600;">🚨 CRITICAL THREAT DETECTED</p>
@@ -1213,7 +1231,17 @@ with st.sidebar.expander("🚨 Alert & Notification Center", expanded=False):
                 </div>
             """, unsafe_allow_html=True)
     else:
-        st.caption("No recent threat alerts logged.")
+        st.caption("No active critical threat alerts.")
+
+    if not warning_reminders.empty:
+        st.markdown("**⚠️ Warning Reminders Only**")
+        for _, row in warning_reminders.iterrows():
+            st.markdown(f"""
+                <div style="background-color: rgba(251, 197, 49, 0.10); border: 1px solid rgba(251, 197, 49, 0.35); border-radius: 6px; padding: 8px; margin-bottom: 6px;">
+                    <p style="margin: 0; color: #fbc531; font-size: 0.82rem; font-weight: 600;">⚠️ WARNING REMINDER</p>
+                    <p style="margin: 3px 0 0 0; color: #e2e8f0; font-size: 0.82rem;">IP: <b>{row['IP']}</b> ({row['Threat']}) — Confidence: <b>{row['Confidence']:.1f}%</b></p>
+                </div>
+            """, unsafe_allow_html=True)
 
 with st.sidebar.expander("🎛️ Filter & Analysis Controls", expanded=True):
     selected_threats = st.multiselect(
@@ -1239,22 +1267,31 @@ with st.sidebar.expander("🛡️ Incident Response (SOAR)", expanded=False):
         st.session_state.cleared_ips = set()
 
     if st.button("Block IP & Push Firewall Rule", type="primary", key="soar_block_ip_btn") and target_ip != "N/A":
-        actor = st.session_state.get('username', 'Unknown')
+        actor = st.session_state.get("username", "Unknown")
         matched_rows = df[df["IP"] == target_ip] if not df.empty else pd.DataFrame()
+        ip_status = str(matched_rows["Status"].iloc[0]).upper() if not matched_rows.empty and "Status" in matched_rows.columns else "WARNING"
         threat_cat = matched_rows["Threat"].iloc[0] if not matched_rows.empty else "Detected Threat"
 
-        with st.spinner(f"Pushing rule to iptables for {target_ip} & notifying users..."):
-            time.sleep(0.8)
-            emailed_count = send_soar_clear_notification(target_ip, threat_cat, actor)
+        if ip_status != "CRITICAL":
+            st.session_state.clear_notice_type = "warning"
+            st.session_state.clear_notice = (
+                f"⚠️ Reminder: IP {target_ip} ({threat_cat}) is only a WARNING — no critical isolation or alert email triggered."
+            )
+            st.rerun()
+        else:
+            with st.spinner(f"Pushing rule to iptables for {target_ip} & notifying users..."):
+                time.sleep(0.8)
+                emailed_count = send_soar_clear_notification(target_ip, threat_cat, actor)
 
-        handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated and alert cleared (By: {actor})")
-        save_cleared_ip(target_ip, actor)
-        st.session_state.cleared_ips = set(load_cleared_ips().keys())
-        st.session_state.clear_notice = (
-            f"Successfully cleared & isolated {target_ip} (Action by: {actor}). "
-            f"Resolution email sent to {emailed_count} registered user(s)."
-        )
-        st.rerun()
+            handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated and alert cleared (By: {actor})")
+            save_cleared_ip(target_ip, actor)
+            st.session_state.cleared_ips = set(load_cleared_ips().keys())
+            st.session_state.clear_notice_type = "success"
+            st.session_state.clear_notice = (
+                f"Successfully cleared & isolated {target_ip} (Action by: {actor}). "
+                f"Resolution email sent to {emailed_count} registered user(s)."
+            )
+            st.rerun()
 
 if user_role == 'admin':
     st.sidebar.markdown("---")
@@ -1504,6 +1541,7 @@ if user_role == 'admin':
                 clear_all_saved_ips()
                 st.session_state.cleared_ips = set()
                 st.session_state.pop("clear_notice", None)
+                st.session_state.pop("clear_notice_type", None)
                 st.rerun()
         else:
             st.caption("No IP alerts have been cleared yet.")
