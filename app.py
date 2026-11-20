@@ -651,6 +651,48 @@ if "SECRET_KEY" not in globals() or not SECRET_KEY:
         _env_sec = _hashlib.sha256(_seed).hexdigest()
     SECRET_KEY = _env_sec
 
+
+def _record_user_login_stats(username: str = "", email: str = "") -> None:
+    """Increment login_count and set last_login across any in-memory/JSON user structures."""
+    from datetime import datetime, timezone, timedelta
+    now_myt = (datetime.now(timezone.utc) + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M:%S MYT")
+    u_norm = (username or "").strip().lower()
+    e_norm = (email or "").strip().lower()
+
+    def _bump_record(rec: dict) -> bool:
+        if not isinstance(rec, dict):
+            return False
+        r_user = str(rec.get("username") or rec.get("user") or "").strip().lower()
+        r_email = str(rec.get("email") or rec.get("user_email") or "").strip().lower()
+        if (u_norm and r_user == u_norm) or (e_norm and r_email == e_norm):
+            cur_cnt = rec.get("login_count", rec.get("logins", 0))
+            try:
+                cur_cnt = int(cur_cnt or 0)
+            except Exception:
+                cur_cnt = 0
+            rec["login_count"] = cur_cnt + 1
+            rec["last_login"] = now_myt
+            return True
+        return False
+
+    # Update common session_state containers if present
+    for key in ("users", "registered_users", "user_accounts", "users_db", "accounts_df"):
+        obj = st.session_state.get(key)
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                if isinstance(v, dict):
+                    if str(k).strip().lower() == u_norm or _bump_record(v):
+                        cur_cnt = v.get("login_count", 0)
+                        try:
+                            cur_cnt = int(cur_cnt or 0)
+                        except Exception:
+                            cur_cnt = 0
+                        v["login_count"] = cur_cnt + 1
+                        v["last_login"] = now_myt
+        elif isinstance(obj, list):
+            for item in obj:
+                _bump_record(item)
+
 def create_session_token(username: str, role: str, email: str, last_active: float) -> str:
     """Create a signed JWT token for refresh persistence (30-minute timeout)."""
     payload = {
@@ -805,6 +847,7 @@ elif url_token:
         restored_role = decoded_url["role"]
         restored_email = decoded_url.get("email") or ""
         st.session_state["logged_in"] = True
+        _record_user_login_stats(st.session_state.get("username") or st.session_state.get("temp_username") or "", st.session_state.get("email") or st.session_state.get("user_email") or st.session_state.get("temp_email") or "")
         st.session_state["username"] = restored_user
         st.session_state["role"] = restored_role
         st.session_state["email"] = restored_email
@@ -2160,6 +2203,7 @@ if user_role == "admin":
 
     col_u1, col_u2 = st.columns([4, 1])
     with col_u1:
+        _apply_stats_to_collection(_load_login_stats_store())
         st.subheader("👥 Registered User Accounts & Login Statistics")
     with col_u2:
         if st.button("Sync Users", key="admin_sync_users_btn", use_container_width=True):
