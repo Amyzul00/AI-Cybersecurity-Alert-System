@@ -605,7 +605,7 @@ def _save_active_sessions(data: dict) -> None:
 
 
 def create_session_token(username: str, role: str, email: str, last_active: float) -> str:
-    """Create a signed JWT token for the single active website session (30-minute timeout)."""
+    """Create a signed JWT token for the active website session (30-minute timeout)."""
     payload = {
         "sub": username,
         "role": role,
@@ -616,7 +616,7 @@ def create_session_token(username: str, role: str, email: str, last_active: floa
 
 
 def persist_session_to_url(username: str, role: str, email: str, last_active: float) -> None:
-    """Store the single active session on the website (30-minute refresh persistence)."""
+    """Persist the single active session token in query params and server vault."""
     token = create_session_token(username, role, email, last_active)
     try:
         st.query_params["session"] = token
@@ -710,24 +710,43 @@ if "forgot_email" not in st.session_state:
 if "forgot_code" not in st.session_state:
     st.session_state["forgot_code"] = ""
 
-# --- STRICT SINGLE-ACCOUNT SESSION & 30-MINUTE REFRESH PERSISTENCE ---
+# --- RESTORE SESSION ON REFRESH (30-MIN WINDOW) WITHOUT BLOCKING NEW USER LOGIN ---
 now_check = time.time()
 active_acct = get_active_single_account()
-st.session_state["locked_by_other_account"] = None
+url_token = st.query_params.get("session")
 
-if active_acct:
-    active_email = (active_acct.get("email") or "").strip().lower()
-    active_user = (active_acct.get("username") or "").strip().lower()
-    cur_email = (st.session_state.get("email") or "").strip().lower()
-    cur_user = (st.session_state.get("username") or "").strip().lower()
-
-    same_account = (
-        (active_email and cur_email and active_email == cur_email)
-        or (not cur_email and active_user and cur_user and active_user == cur_user)
-    )
-
-    if not st.session_state["logged_in"] or same_account:
-        # Restore or keep this single active account across browser refresh
+if st.session_state["logged_in"]:
+    if not active_acct:
+        st.session_state["logged_in"] = False
+        st.session_state["username"] = ""
+        st.session_state["role"] = ""
+        st.session_state["email"] = None
+        st.session_state["user_email"] = None
+        st.session_state["last_activity_ts"] = None
+        clear_session_from_url()
+    else:
+        active_email = (active_acct.get("email") or "").strip().lower()
+        cur_email = (st.session_state.get("email") or "").strip().lower()
+        if active_email and cur_email and active_email != cur_email:
+            # Another account signed in and took over the single active session
+            st.session_state["logged_in"] = False
+            st.session_state["username"] = ""
+            st.session_state["role"] = ""
+            st.session_state["email"] = None
+            st.session_state["user_email"] = None
+            st.session_state["otp_required"] = False
+            st.session_state["last_activity_ts"] = None
+            st.session_state["session_timeout_notice"] = (
+                f"Session switched to {active_acct['username']}. Only 1 account can stay active at a time."
+            )
+elif url_token and active_acct:
+    # Only auto-restore on page reload if this tab carries a valid token matching the active session
+    decoded_url = verify_websocket_token(url_token)
+    if (
+        decoded_url
+        and (now_check - float(decoded_url.get("last_active", 0.0))) <= SESSION_TIMEOUT_SECONDS
+        and (decoded_url.get("email") or "").strip().lower() == (active_acct.get("email") or "").strip().lower()
+    ):
         st.session_state["logged_in"] = True
         st.session_state["username"] = active_acct["username"]
         st.session_state["role"] = active_acct["role"]
@@ -741,29 +760,8 @@ if active_acct:
             st.session_state["email"] or "",
             now_check,
         )
-    else:
-        # Another browser/tab session tried to use a different account while 1 account is active
-        st.session_state["logged_in"] = False
-        st.session_state["username"] = ""
-        st.session_state["role"] = ""
-        st.session_state["email"] = None
-        st.session_state["user_email"] = None
-        st.session_state["otp_required"] = False
-        st.session_state["locked_by_other_account"] = active_acct["username"]
-else:
-    if st.session_state.get("logged_in"):
-        st.session_state["logged_in"] = False
-        st.session_state["username"] = ""
-        st.session_state["role"] = ""
-        st.session_state["email"] = None
-        st.session_state["user_email"] = None
-        st.session_state["last_activity_ts"] = None
-        st.session_state["session_timeout_notice"] = (
-            "?? Session expired after 30 minutes (or was signed out). Please sign in again."
-        )
-    clear_session_from_url()
 
-if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
+if (st.session_state.get("email") or "").strip().lower() == "warisansecurityalerts@gmail.com":
     st.session_state.role = "admin"
 
 # --- FONT AWESOME CDN FOR SIDEBAR ICONS ---
@@ -771,13 +769,6 @@ st.markdown('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs
 
 # --- HIDE TOP-RIGHT TOOLBAR BUTTONS & CONDITIONAL TOP PROGRESS BAR ---
 if not st.session_state["logged_in"]:
-    _holder = st.session_state.get("locked_by_other_account")
-    if _holder and get_active_single_account():
-        st.warning(
-            f"?? Only **1 account** can be signed in at a time on this website. "
-            f"**{_holder}** is currently signed in. Sign out from that session or wait until the 30-minute session expires before signing in with another account."
-        )
-        st.stop()
 
     st.markdown("""
         <style>
