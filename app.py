@@ -11,10 +11,11 @@
 )
 import threat_detector
 import base64
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 import json
 from pathlib import Path
+from zoneinfo import ZoneInfo
 import os
 import random
 import smtplib
@@ -40,6 +41,17 @@ from reportlab.platypus import (
 )
 import streamlit as st
 
+try:
+    MY_TZ = ZoneInfo("Asia/Kuala_Lumpur")
+except Exception:
+    MY_TZ = timezone(timedelta(hours=8))
+
+
+def my_now() -> datetime:
+    """Return current datetime in Malaysia Time (Asia/Kuala_Lumpur, UTC+8)."""
+    return datetime.now(MY_TZ)
+
+
 CLEARED_IPS_FILE = Path("cleared_ips.json")
 LOCKOUT_FILE = Path("password_lockouts.json")
 ADMIN_VAULT_FILE = Path("admin_data_vault.json")
@@ -64,7 +76,7 @@ def save_cleared_ip(ip, cleared_by):
     records = load_cleared_ips()
     records[ip] = {
         "cleared_by": cleared_by,
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "timestamp": my_now().strftime("%Y-%m-%d %H:%M:%S MYT"),
     }
     CLEARED_IPS_FILE.write_text(json.dumps(records, indent=2), encoding="utf-8")
     sync_admin_vault()
@@ -151,16 +163,12 @@ def _ensure_users_table_columns(cursor) -> set:
 
 
 def record_login_to_db(email_or_user: str) -> None:
-    """Ensure login_count and last_login are always updated in SQLite and synced to the Admin Vault."""
-    try:
-        increment_user_login(email_or_user)
-    except Exception:
-        pass
+    """Update login_count and Malaysia Time last_login in SQLite and sync to Admin Vault."""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         _ensure_users_table_columns(cursor)
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now_str = my_now().strftime("%Y-%m-%d %H:%M:%S MYT")
         cursor.execute(
             """
             UPDATE users
@@ -203,7 +211,7 @@ def sync_admin_vault() -> dict:
         pass
 
     vault_payload = {
-        "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "last_updated": my_now().strftime("%Y-%m-%d %H:%M:%S MYT"),
         "cleared_ips": load_cleared_ips(),
         "users": users_list,
     }
@@ -216,11 +224,7 @@ def sync_admin_vault() -> dict:
 
 
 def link_registered_account_to_db(username: str, email: str, password: str, role: str = "user") -> tuple[bool, str]:
-    """
-    Save every newly registered account into the SQLite users table (database.py),
-    guaranteeing column defaults and duplicate checks even if register_user() differs,
-    and immediately sync to the Admin Vault so it appears in user tables and email lists.
-    """
+    """Save every newly registered account into the SQLite users table and sync to Admin Vault."""
     clean_user = (username or "").strip()
     clean_email = (email or "").strip().lower()
     clean_role = (role or "user").strip().lower()
@@ -561,11 +565,7 @@ ALGORITHM = "HS256"
 
 
 def verify_websocket_token(token: str):
-    """
-    Cryptographically verify incoming WebSocket connection tokens
-    against the server's SECRET_KEY and specified ALGORITHM.
-    Enforces mandatory claim validation ('sub' and 'role').
-    """
+    """Cryptographically verify incoming JWT session tokens."""
     try:
         payload = jwt.decode(
             token,
@@ -580,6 +580,33 @@ def verify_websocket_token(token: str):
 
     except jwt.InvalidTokenError:
         return None
+
+
+def create_session_token(username: str, role: str, email: str, last_active: float) -> str:
+    """Create a signed JWT session token that survives browser reloads for 30 minutes."""
+    payload = {
+        "sub": username,
+        "role": role,
+        "email": email,
+        "last_active": float(last_active),
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def persist_session_to_url(username: str, role: str, email: str, last_active: float) -> None:
+    try:
+        token = create_session_token(username, role, email, last_active)
+        st.query_params["session"] = token
+    except Exception:
+        pass
+
+
+def clear_session_from_url() -> None:
+    try:
+        if "session" in st.query_params:
+            del st.query_params["session"]
+    except Exception:
+        pass
 
 
 # --- GLOBAL SESSION STATE INITIALIZATION ---
@@ -621,6 +648,33 @@ if "forgot_email" not in st.session_state:
     st.session_state["forgot_email"] = ""
 if "forgot_code" not in st.session_state:
     st.session_state["forgot_code"] = ""
+
+# --- RESTORE ACTIVE SESSION ACROSS BROWSER REFRESH (UNTIL > 30 MINUTES INACTIVE) ---
+if not st.session_state["logged_in"]:
+    url_token = st.query_params.get("session")
+    if url_token:
+        decoded = verify_websocket_token(url_token)
+        now_check = time.time()
+        if decoded and (now_check - float(decoded.get("last_active", 0.0))) <= SESSION_TIMEOUT_SECONDS:
+            st.session_state["logged_in"] = True
+            st.session_state["username"] = decoded["sub"]
+            st.session_state["role"] = decoded["role"]
+            st.session_state["email"] = decoded.get("email")
+            st.session_state["user_email"] = decoded.get("email")
+            st.session_state["last_activity_ts"] = now_check
+            st.session_state["session_timeout_notice"] = ""
+            persist_session_to_url(
+                st.session_state["username"],
+                st.session_state["role"],
+                st.session_state["email"] or "",
+                now_check,
+            )
+        else:
+            clear_session_from_url()
+            if decoded:
+                st.session_state["session_timeout_notice"] = (
+                    "⏱️ Session expired after 30 minutes. You have been automatically signed out for security."
+                )
 
 if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
     st.session_state.role = "admin"
@@ -733,7 +787,7 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=95.8, target_ip="
     SENDER_PASSWORD = "zjmm vunm ngec wkvu"
 
     subject = f"🚨 [WARISAN SOC] CRITICAL THREAT DETECTED: {threat_label}"
-    timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+    timestamp_str = my_now().strftime("%Y-%m-%d %H:%M:%S MYT")
 
     html_body = f"""
     <!DOCTYPE html>
@@ -819,7 +873,7 @@ def send_soar_clear_notification(target_ip, threat_type, cleared_by):
     SENDER_PASSWORD = "zjmm vunm ngec wkvu"
 
     subject = f"✅ [WARISAN SOC] THREAT RESOLVED & IP ISOLATED: {target_ip}"
-    timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+    timestamp_str = my_now().strftime("%Y-%m-%d %H:%M:%S MYT")
 
     html_body = f"""
     <!DOCTYPE html>
@@ -1046,8 +1100,15 @@ if not st.session_state["logged_in"]:
 
                         record_login_to_db(st.session_state["temp_email"])
 
-                        st.session_state["last_activity_ts"] = time.time()
+                        login_now = time.time()
+                        st.session_state["last_activity_ts"] = login_now
                         st.session_state["session_timeout_notice"] = ""
+                        persist_session_to_url(
+                            st.session_state["username"],
+                            st.session_state["role"],
+                            st.session_state["email"] or "",
+                            login_now,
+                        )
                         st.session_state["otp_required"] = False
                         st.session_state["generated_otp"] = ""
                         st.rerun()
@@ -1320,12 +1381,19 @@ if last_act is not None and (now_ts - float(last_act)) > SESSION_TIMEOUT_SECONDS
     st.session_state["user_email"] = None
     st.session_state["otp_required"] = False
     st.session_state["last_activity_ts"] = None
+    clear_session_from_url()
     st.session_state["session_timeout_notice"] = (
         "⏱️ Session expired after 30 minutes. You have been automatically signed out for security."
     )
     st.rerun()
 
 st.session_state["last_activity_ts"] = now_ts
+persist_session_to_url(
+    st.session_state.get("username", ""),
+    st.session_state.get("role", "user"),
+    st.session_state.get("email") or "",
+    now_ts,
+)
 
 if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
     st.session_state.role = "admin"
@@ -1437,7 +1505,7 @@ def generate_pdf_report(dataframe):
         spaceAfter=10,
     )
 
-    current_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+    current_timestamp = my_now().strftime("%Y-%m-%d %H:%M:%S MYT")
     header_text_elements = [
         Paragraph("Warisan AI-Based Threat Detection & Real-time Alert System Executive Report", title_style),
         Paragraph(f"Generated by Warisan AI-Based Threat Detection & Real-time Alert System | Timestamp: {current_timestamp}", subtitle_style),
@@ -1547,6 +1615,7 @@ with st.sidebar.expander("👤 User Profile & Session", expanded=True):
         st.session_state["email"] = None
         st.session_state["user_email"] = None
         st.session_state["last_activity_ts"] = None
+        clear_session_from_url()
         st.rerun()
 
 if st.sidebar.button("🔄 Refresh & Rescan", use_container_width=True, key="sidebar_rescan_btn"):
@@ -1843,7 +1912,7 @@ with st.expander(f"🔍 View VirusTotal / AbuseIPDB Reputation Report ({selected
         st.markdown(f"""
 - **Community Reputation:** Malicious (Confidence: {vt_confidence}%)
 - **Associated Malware Families:** {malware_families}
-- **Last Reported Activity:** Today, 12:04 UTC
+- **Last Reported Activity:** Today, {my_now().strftime("%H:%M")} MYT
             """)
     with col_ti2:
         st.markdown(f"""
@@ -1893,7 +1962,7 @@ st.divider()
 
 # --- ADMIN-ONLY CLEARED IP RECORDS, VAULT BACKUP & REGISTERED USER ACCOUNTS ---
 if user_role == "admin":
-    sync_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    sync_ts = my_now().strftime("%Y-%m-%d %H:%M:%S MYT")
     st.caption(f"🔄 Live Admin Telemetry Synced: `{sync_ts}`")
 
     cleared_records = load_cleared_ips()
@@ -1927,7 +1996,7 @@ if user_role == "admin":
         st.download_button(
             label="📥 Download Admin Data Backup (JSON)",
             data=json.dumps(vault_snapshot, indent=2).encode("utf-8"),
-            file_name=f"warisan_admin_vault_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+            file_name=f"warisan_admin_vault_{my_now().strftime('%Y%m%d_%H%M%S')}.json",
             mime="application/json",
             use_container_width=True,
         )
