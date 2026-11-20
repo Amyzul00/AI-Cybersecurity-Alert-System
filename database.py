@@ -1,3 +1,14 @@
+
+def _row_to_dict(row) -> dict:
+    if row is None:
+        return {}
+    if isinstance(row, dict):
+        return row
+    try:
+        return {k: row[k] for k in row.keys()}
+    except Exception:
+        return {}
+
 import datetime
 import json
 import os
@@ -334,7 +345,7 @@ def get_all_registered_users():
     try:
         cursor.execute("SELECT email FROM users WHERE email IS NOT NULL AND TRIM(email) != ''")
         rows = cursor.fetchall()
-        return [row["email"].strip().lower() for row in rows if row["email"] and "@" in str(row["email"])]
+        return [_row_to_dict(row).get("email", "").strip().lower() for row in rows if _row_to_dict(row).get("email", "") and "@" in str(_row_to_dict(row).get("email", ""))]
     finally:
         cursor.close()
         conn.close()
@@ -402,14 +413,14 @@ def delete_user_account(identifier: str) -> tuple[bool, str]:
         if not row:
             return False, "Account not found in database."
 
-        if (row["email"] or "").strip().lower() == "warisansecurityalerts@gmail.com":
+        if (_row_to_dict(row).get("email", "") or "").strip().lower() == "warisansecurityalerts@gmail.com":
             return False, "The primary admin account (warisansecurityalerts@gmail.com) cannot be deleted."
 
-        cursor.execute("DELETE FROM users WHERE id = ?", (row["id"],))
+        cursor.execute("DELETE FROM users WHERE id = ?", (_row_to_dict(row).get("id"),))
         conn.commit()
         _sync_users_backup(cursor)
         conn.commit()
-        return True, f"Deleted account '{row['username']}' ({row['email']})."
+        return True, f"Deleted account '{_row_to_dict(row).get("username", "")}' ({_row_to_dict(row).get("email", "")})."
     except Exception as e:
         return False, f"Failed to delete account: {e}"
     finally:

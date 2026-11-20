@@ -1174,7 +1174,7 @@ def send_soar_clear_notification(target_ip, threat_type, cleared_by):
             </div>
 
             <div class="resolved-card">
-                <div class="resolved-header">? CRITICAL THREAT CLEARED & HOST ISOLATED</div>
+                <div class="resolved-header">CRITICAL THREAT CLEARED & HOST ISOLATED</div>
                 <div class="resolved-row">Isolated IP Address: &nbsp;<b>{target_ip}</b></div>
                 <div class="resolved-row">Threat Category: &nbsp;<b>{threat_type}</b></div>
                 <div class="resolved-row">Action Executed By: &nbsp;<b>{cleared_by}</b></div>
@@ -1248,7 +1248,7 @@ def send_welcome_email(recipient_email, username):
                 <p class="subtitle">AI Threat Analytics & Incident Operations</p>
             </div>
             <div class="greeting">Hello {username},</div>
-            <div class="badge">? Account Successfully Registered</div>
+            <div class="badge">Account Successfully Registered</div>
             <div class="message">
                 Your account for the Warisan AI-Based Threat Detection & Real-time Alert System Portal has been successfully created and secured with 2FA privileges.
             </div>
@@ -1345,7 +1345,7 @@ if not st.session_state["logged_in"]:
         if st.session_state["otp_required"]:
             st.markdown(f"""
                 <div style="background-color: #0e1626; border: 1px solid #1e293b; border-radius: 10px; padding: 16px; margin-bottom: 16px;">
-                    <p style="margin: 0 0 6px 0; color: #94a3b8; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">? Security Verification (2FA)</p>
+                    <p style="margin: 0 0 6px 0; color: #94a3b8; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Security Verification (2FA)</p>
                     <p style="margin: 0; color: #f8fafc; font-size: 0.95rem;">A verification code has been dispatched to: <b>{st.session_state['temp_email']}</b></p>
                 </div>
             """, unsafe_allow_html=True)
