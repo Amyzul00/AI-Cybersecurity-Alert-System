@@ -1352,7 +1352,7 @@ if not st.session_state["logged_in"]:
 
             st.markdown(f"""
                 <div style="background-color: rgba(255, 75, 75, 0.08); border: 1px solid rgba(255, 75, 75, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
-                    <p style="margin: 0; color: #ff8080; font-size: 0.88rem; font-weight: 500;">? <b>Secure Authentication Key:</b> <code style="background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 4px; color: #fff;">{st.session_state['generated_otp']}</code></p>
+                    <p style="margin: 0; color: #ff8080; font-size: 0.88rem; font-weight: 500;"><b>Secure Authentication Key:</b> <code style="background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 4px; color: #fff;">{st.session_state['generated_otp']}</code></p>
                 </div>
             """, unsafe_allow_html=True)
 
