@@ -638,37 +638,36 @@ def _save_active_sessions(data: dict) -> None:
 
 
 def create_session_token(username: str, role: str, email: str, last_active: float) -> str:
-    """Create a signed JWT token for the active website session (30-minute timeout)."""
+    """Create a signed JWT token for refresh persistence (30-minute timeout)."""
     payload = {
         "sub": username,
         "role": role,
-        "email": email,
+        "email": email or "",
         "last_active": float(last_active),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def persist_session_to_url(username: str, role: str, email: str, last_active: float) -> None:
-    """Persist the single active session token in query params and server vault."""
+    """Persist the active session token in URL query params and local session file."""
     token = create_session_token(username, role, email, last_active)
     try:
         st.query_params["session"] = token
     except Exception:
         pass
-    sessions = {
+    _save_active_sessions({
         SINGLETON_SESSION_KEY: {
             "token": token,
             "username": username,
             "role": role,
-            "email": email,
+            "email": email or "",
             "last_active": float(last_active),
         }
-    }
-    _save_active_sessions(sessions)
+    })
 
 
 def get_active_single_account() -> dict | None:
-    """Return the currently active single session if still within the 30-minute window."""
+    """Return the active session from active_sessions.json if still within 30 minutes."""
     sess = _load_active_sessions().get(SINGLETON_SESSION_KEY)
     if not isinstance(sess, dict):
         return None
@@ -743,56 +742,63 @@ if "forgot_email" not in st.session_state:
 if "forgot_code" not in st.session_state:
     st.session_state["forgot_code"] = ""
 
-# --- RESTORE SESSION ON REFRESH (30-MIN WINDOW) WITHOUT BLOCKING NEW USER LOGIN ---
+# --- RESTORE USER OR ADMIN SESSION ACROSS PAGE REFRESH (30-MIN WINDOW) ---
 now_check = time.time()
 active_acct = get_active_single_account()
 url_token = st.query_params.get("session")
 
 if st.session_state["logged_in"]:
-    if not active_acct:
+    last_act = float(st.session_state.get("last_activity_ts") or now_check)
+    if (now_check - last_act) > SESSION_TIMEOUT_SECONDS:
         st.session_state["logged_in"] = False
         st.session_state["username"] = ""
         st.session_state["role"] = ""
         st.session_state["email"] = None
         st.session_state["user_email"] = None
         st.session_state["last_activity_ts"] = None
+        st.session_state["session_timeout_notice"] = (
+            "Session expired after 30 minutes of inactivity. Please sign in again."
+        )
         clear_session_from_url()
     else:
-        active_email = (active_acct.get("email") or "").strip().lower()
-        cur_email = (st.session_state.get("email") or "").strip().lower()
-        if active_email and cur_email and active_email != cur_email:
-            # Another account signed in and took over the single active session
-            st.session_state["logged_in"] = False
-            st.session_state["username"] = ""
-            st.session_state["role"] = ""
-            st.session_state["email"] = None
-            st.session_state["user_email"] = None
-            st.session_state["otp_required"] = False
-            st.session_state["last_activity_ts"] = None
-            st.session_state["session_timeout_notice"] = (
-                f"Session switched to {active_acct['username']}. Only 1 account can stay active at a time."
-            )
-elif url_token and active_acct:
-    # Only auto-restore on page reload if this tab carries a valid token matching the active session
-    decoded_url = verify_websocket_token(url_token)
-    if (
-        decoded_url
-        and (now_check - float(decoded_url.get("last_active", 0.0))) <= SESSION_TIMEOUT_SECONDS
-        and (decoded_url.get("email") or "").strip().lower() == (active_acct.get("email") or "").strip().lower()
-    ):
-        st.session_state["logged_in"] = True
-        st.session_state["username"] = active_acct["username"]
-        st.session_state["role"] = active_acct["role"]
-        st.session_state["email"] = active_acct["email"]
-        st.session_state["user_email"] = active_acct["email"]
         st.session_state["last_activity_ts"] = now_check
-        st.session_state["session_timeout_notice"] = ""
         persist_session_to_url(
             st.session_state["username"],
             st.session_state["role"],
-            st.session_state["email"] or "",
+            st.session_state.get("email") or "",
             now_check,
         )
+elif url_token:
+    decoded_url = verify_websocket_token(url_token)
+    token_last_active = float(decoded_url.get("last_active", 0.0)) if decoded_url else 0.0
+    within_30_min = decoded_url is not None and (now_check - token_last_active) <= SESSION_TIMEOUT_SECONDS
+
+    # If active_sessions.json exists and belongs to a different account, respect the newer account
+    matches_active_file = True
+    if active_acct and decoded_url:
+        file_email = (active_acct.get("email") or "").strip().lower()
+        tok_email = (decoded_url.get("email") or "").strip().lower()
+        file_user = (active_acct.get("username") or "").strip().lower()
+        tok_user = (decoded_url.get("sub") or "").strip().lower()
+        if file_email and tok_email:
+            matches_active_file = file_email == tok_email
+        elif file_user and tok_user:
+            matches_active_file = file_user == tok_user
+
+    if within_30_min and matches_active_file:
+        restored_user = decoded_url["sub"]
+        restored_role = decoded_url["role"]
+        restored_email = decoded_url.get("email") or ""
+        st.session_state["logged_in"] = True
+        st.session_state["username"] = restored_user
+        st.session_state["role"] = restored_role
+        st.session_state["email"] = restored_email
+        st.session_state["user_email"] = restored_email
+        st.session_state["last_activity_ts"] = now_check
+        st.session_state["session_timeout_notice"] = ""
+        persist_session_to_url(restored_user, restored_role, restored_email, now_check)
+    else:
+        clear_session_from_url()
 
 if (st.session_state.get("email") or "").strip().lower() == "warisansecurityalerts@gmail.com":
     st.session_state.role = "admin"
