@@ -1,17 +1,62 @@
-import sqlite3
 import datetime
+import json
 import os
+import sqlite3
 import time
+from pathlib import Path
 import pandas as pd
 
-DB_NAME = 'threat_logs.db'
+DB_NAME = "threat_logs.db"
+USERS_BACKUP_FILE = Path("users_backup.json")
 
 
 def get_db_connection():
     """Create a connection to the SQLite cybersecurity database."""
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, check_same_thread=False)
     conn.row_factory = sqlite3.Row  # Enables dictionary-like access to rows
     return conn
+
+
+def _sync_users_backup(cursor):
+    """Persist current users table rows to a JSON backup file."""
+    try:
+        cursor.execute(
+            "SELECT username, email, role, password, COALESCE(login_count, 0) AS login_count, last_login, created_at FROM users ORDER BY id ASC"
+        )
+        rows = [dict(r) for r in cursor.fetchall()]
+        USERS_BACKUP_FILE.write_text(json.dumps(rows, indent=2), encoding="utf-8")
+    except Exception as e:
+        print(f"[-] Failed to sync users backup JSON: {e}")
+
+
+def _restore_users_from_backup(cursor):
+    """Restore users from JSON backup into SQLite if missing (e.g., after container reset)."""
+    if not USERS_BACKUP_FILE.exists():
+        return
+    try:
+        saved_users = json.loads(USERS_BACKUP_FILE.read_text(encoding="utf-8"))
+        if not isinstance(saved_users, list):
+            return
+        for u in saved_users:
+            uname = (u.get("username") or "").strip()
+            uemail = (u.get("email") or "").strip().lower()
+            urole = (u.get("role") or "user").strip().lower()
+            upass = u.get("password") or ""
+            lcount = int(u.get("login_count") or 0)
+            llogin = u.get("last_login")
+            if not uname or not uemail:
+                continue
+            cursor.execute("SELECT id FROM users WHERE LOWER(TRIM(email)) = ?", (uemail,))
+            if not cursor.fetchone():
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO users (username, email, role, password, login_count, last_login)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (uname, uemail, urole, upass, lcount, llogin),
+                )
+    except Exception as e:
+        print(f"[-] Failed to restore users backup JSON: {e}")
 
 
 def init_db():
@@ -19,7 +64,7 @@ def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS threat_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp TEXT NOT NULL,
@@ -31,9 +76,9 @@ def init_db():
                 confidence_score REAL NOT NULL,
                 raw_features TEXT
             )
-        ''')
+        """)
 
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
@@ -44,9 +89,9 @@ def init_db():
                 last_login TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        ''')
+        """)
 
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS latency_metrics (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 threat_log_id INTEGER,
@@ -63,7 +108,7 @@ def init_db():
                 e2e_email_ms REAL,
                 FOREIGN KEY (threat_log_id) REFERENCES threat_logs(id)
             )
-        ''')
+        """)
 
         # --- AUTO-MIGRATE MISSING COLUMNS FOR EXISTING DEPLOYMENTS ---
         cursor.execute("PRAGMA table_info(users)")
@@ -76,17 +121,23 @@ def init_db():
         # --- SEED DEFAULT USERS (PREVENTS ACCOUNT LOSS ON RESTART) ---
         default_users = [
             ("Admin", "warisansecurityalerts@gmail.com", "admin", "Admin123"),
-            ("Ameyzul", "ikmalmeyzul@gmail.com", "user", "Ameyzul123")
+            ("Ameyzul", "ikmalmeyzul@gmail.com", "user", "Ameyzul123"),
+            ("zul", "sendermalwaree@gmail.com", "user", "zul123"),
         ]
 
         for uname, uemail, urole, upass in default_users:
-            cursor.execute("SELECT id FROM users WHERE email = ?", (uemail,))
+            clean_email = uemail.strip().lower()
+            cursor.execute("SELECT id FROM users WHERE LOWER(TRIM(email)) = ?", (clean_email,))
             if not cursor.fetchone():
                 cursor.execute(
-                    "INSERT INTO users (username, email, role, password, login_count) VALUES (?, ?, ?, ?, 0)",
-                    (uname, uemail, urole, upass)
+                    "INSERT OR IGNORE INTO users (username, email, role, password, login_count) VALUES (?, ?, ?, ?, 0)",
+                    (uname, clean_email, urole, upass),
                 )
 
+        # --- RESTORE ANY PREVIOUSLY REGISTERED USERS FROM JSON SNAPSHOT ---
+        _restore_users_from_backup(cursor)
+        conn.commit()
+        _sync_users_backup(cursor)
         conn.commit()
         print(f"[+] SQLite Database initialized successfully: {DB_NAME}")
     except Exception as e:
@@ -110,13 +161,13 @@ def log_threat(
     cursor = conn.cursor()
     row_id = None
     try:
-        cursor.execute('''
+        cursor.execute("""
             INSERT INTO threat_logs (
                 timestamp, src_ip, dst_ip, protocol,
                 threat_type, severity, confidence_score, raw_features
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
+        """, (
             timestamp, src_ip, dst_ip, protocol,
             threat_type, severity, float(confidence_score),
             str(raw_features)
@@ -159,7 +210,6 @@ def log_pipeline_latency(
     dashboard_update_ms = ns_to_ms(t5_db_ns, t6_dashboard_ns)
     e2e_dashboard_ms = ns_to_ms(t0_capture_ns, t6_dashboard_ns)
 
-    # Email dispatch occurs concurrently/subsequent to DB commit (t5)
     email_delivery_ms = ns_to_ms(t5_db_ns, t7_email_ns) if t7_email_ns else None
     e2e_email_ms = ns_to_ms(t0_capture_ns, t7_email_ns) if t7_email_ns else None
 
@@ -167,7 +217,7 @@ def log_pipeline_latency(
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute('''
+        cursor.execute("""
             INSERT INTO latency_metrics (
                 threat_log_id, recorded_at, threat_type,
                 collection_ms, extraction_ms, buffering_ms,
@@ -175,7 +225,7 @@ def log_pipeline_latency(
                 email_delivery_ms, e2e_dashboard_ms, e2e_email_ms
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
+        """, (
             threat_log_id, recorded_at, threat_type,
             collection_ms, extraction_ms, buffering_ms,
             inference_ms, db_logging_ms, dashboard_update_ms,
@@ -246,13 +296,28 @@ def fetch_recent_threats(limit=50):
 
 def register_user(username: str, email: str, password: str, role: str = "user") -> bool:
     """Register a new user into the database. Returns True if successful, False if duplicate."""
+    clean_user = (username or "").strip()
+    clean_email = (email or "").strip().lower()
+    clean_role = (role or "user").strip().lower()
+    if not clean_user or not clean_email or not password:
+        return False
+
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO users (username, email, role, password, login_count) VALUES (?, ?, ?, ?, 0)",
-            (username.strip(), email.strip().lower(), role, password)
+            "SELECT id FROM users WHERE LOWER(TRIM(username)) = LOWER(?) OR LOWER(TRIM(email)) = LOWER(?)",
+            (clean_user, clean_email),
         )
+        if cursor.fetchone():
+            return False
+
+        cursor.execute(
+            "INSERT INTO users (username, email, role, password, login_count) VALUES (?, ?, ?, ?, 0)",
+            (clean_user, clean_email, clean_role, password)
+        )
+        conn.commit()
+        _sync_users_backup(cursor)
         conn.commit()
         return True
     except sqlite3.IntegrityError:
@@ -267,9 +332,9 @@ def get_all_registered_users():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT email FROM users WHERE email IS NOT NULL AND email != ''")
+        cursor.execute("SELECT email FROM users WHERE email IS NOT NULL AND TRIM(email) != ''")
         rows = cursor.fetchall()
-        return [row['email'].strip() for row in rows if row['email'] and "@" in str(row['email'])]
+        return [row["email"].strip().lower() for row in rows if row["email"] and "@" in str(row["email"])]
     finally:
         cursor.close()
         conn.close()
@@ -281,10 +346,18 @@ def increment_user_login(email: str):
     cursor = conn.cursor()
     try:
         current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ident = (email or "").strip()
         cursor.execute(
-            "UPDATE users SET login_count = login_count + 1, last_login = ? WHERE email = ?",
-            (current_time, email.strip().lower())
+            """
+            UPDATE users
+            SET login_count = COALESCE(login_count, 0) + 1,
+                last_login = ?
+            WHERE LOWER(TRIM(email)) = LOWER(?) OR LOWER(TRIM(username)) = LOWER(?)
+            """,
+            (current_time, ident, ident)
         )
+        conn.commit()
+        _sync_users_backup(cursor)
         conn.commit()
     except Exception as e:
         print(f"[-] Failed to update login count: {e}")
@@ -298,7 +371,7 @@ def get_all_user_accounts():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT username, email, role, login_count, last_login FROM users")
+        cursor.execute("SELECT username, email, role, COALESCE(login_count, 0), last_login FROM users ORDER BY id ASC")
         rows = cursor.fetchall()
         return pd.DataFrame(rows, columns=["Username", "Email", "Role", "Login Count", "Last Login"])
     except Exception as e:
@@ -314,12 +387,17 @@ def update_user_password(email: str, new_password: str) -> bool:
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        clean_email = (email or "").strip().lower()
         cursor.execute(
-            "UPDATE users SET password = ? WHERE email = ?",
-            (new_password, email.strip().lower())
+            "UPDATE users SET password = ? WHERE LOWER(TRIM(email)) = ?",
+            (new_password, clean_email)
         )
-        conn.commit()
-        return cursor.rowcount > 0
+        updated = cursor.rowcount > 0
+        if updated:
+            conn.commit()
+            _sync_users_backup(cursor)
+            conn.commit()
+        return updated
     except Exception as e:
         print(f"[-] Password update error: {e}")
         return False

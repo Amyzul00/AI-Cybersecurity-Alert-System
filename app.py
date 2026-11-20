@@ -43,6 +43,7 @@ import streamlit as st
 CLEARED_IPS_FILE = Path("cleared_ips.json")
 LOCKOUT_FILE = Path("password_lockouts.json")
 ADMIN_VAULT_FILE = Path("admin_data_vault.json")
+USERS_BACKUP_FILE = Path("users_backup.json")
 MAX_PASSWORD_ATTEMPTS = 3
 LOCKOUT_DURATION_SECONDS = 300  # 5 minutes
 SESSION_TIMEOUT_SECONDS = 1800  # 30 minutes
@@ -136,6 +137,19 @@ def clear_password_lockout(identifier: str) -> None:
         save_lockouts(lockouts)
 
 
+def _ensure_users_table_columns(cursor) -> set:
+    """Inspect the SQLite users table columns and ensure login_count and last_login exist."""
+    cursor.execute("PRAGMA table_info(users)")
+    cols = {row["name"] if hasattr(row, "keys") else row[1] for row in cursor.fetchall()}
+    if "login_count" not in cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN login_count INTEGER DEFAULT 0")
+        cols.add("login_count")
+    if "last_login" not in cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN last_login TEXT")
+        cols.add("last_login")
+    return cols
+
+
 def record_login_to_db(email_or_user: str) -> None:
     """Ensure login_count and last_login are always updated in SQLite and synced to the Admin Vault."""
     try:
@@ -145,6 +159,7 @@ def record_login_to_db(email_or_user: str) -> None:
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+        _ensure_users_table_columns(cursor)
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute(
             """
@@ -170,7 +185,8 @@ def sync_admin_vault() -> dict:
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT username, password, role, email, login_count, last_login FROM users")
+        _ensure_users_table_columns(cursor)
+        cursor.execute("SELECT username, password, role, email, login_count, last_login FROM users ORDER BY id ASC")
         rows = cursor.fetchall()
         for r in rows:
             users_list.append({
@@ -193,22 +209,10 @@ def sync_admin_vault() -> dict:
     }
     try:
         ADMIN_VAULT_FILE.write_text(json.dumps(vault_payload, indent=2), encoding="utf-8")
+        USERS_BACKUP_FILE.write_text(json.dumps(users_list, indent=2), encoding="utf-8")
     except Exception:
         pass
     return vault_payload
-
-
-def _ensure_users_table_columns(cursor) -> set:
-    """Inspect the SQLite users table columns and ensure login_count and last_login exist."""
-    cursor.execute("PRAGMA table_info(users)")
-    cols = {row["name"] if isinstance(row, dict) or hasattr(row, "keys") else row[1] for row in cursor.fetchall()}
-    if "login_count" not in cols:
-        cursor.execute("ALTER TABLE users ADD COLUMN login_count INTEGER DEFAULT 0")
-        cols.add("login_count")
-    if "last_login" not in cols:
-        cursor.execute("ALTER TABLE users ADD COLUMN last_login TEXT")
-        cols.add("last_login")
-    return cols
 
 
 def link_registered_account_to_db(username: str, email: str, password: str, role: str = "user") -> tuple[bool, str]:
@@ -245,7 +249,6 @@ def link_registered_account_to_db(username: str, email: str, password: str, role
         except Exception:
             created = False
 
-        # Re-check whether the row was actually inserted into SQLite
         cursor.execute(
             "SELECT id FROM users WHERE LOWER(TRIM(email)) = LOWER(?)",
             (clean_email,),
@@ -311,14 +314,24 @@ def restore_from_vault_payload(vault_payload: dict) -> tuple[int, int]:
             cursor.execute("SELECT id FROM users WHERE LOWER(TRIM(email)) = ?", (uemail,))
             existing = cursor.fetchone()
             if existing:
-                cursor.execute(
-                    """
-                    UPDATE users
-                    SET username = ?, role = ?, login_count = ?, last_login = ?
-                    WHERE LOWER(TRIM(email)) = ?
-                    """,
-                    (uname, urole, lcount, llogin, uemail),
-                )
+                if upass:
+                    cursor.execute(
+                        """
+                        UPDATE users
+                        SET username = ?, password = ?, role = ?, login_count = ?, last_login = ?
+                        WHERE LOWER(TRIM(email)) = ?
+                        """,
+                        (uname, upass, urole, lcount, llogin, uemail),
+                    )
+                else:
+                    cursor.execute(
+                        """
+                        UPDATE users
+                        SET username = ?, role = ?, login_count = ?, last_login = ?
+                        WHERE LOWER(TRIM(email)) = ?
+                        """,
+                        (uname, urole, lcount, llogin, uemail),
+                    )
             else:
                 cursor.execute(
                     """
@@ -1217,6 +1230,14 @@ if not st.session_state["logged_in"]:
                                 cursor.close()
                                 conn.close()
 
+                                if not record and ADMIN_VAULT_FILE.exists():
+                                    vault_data = json.loads(ADMIN_VAULT_FILE.read_text(encoding="utf-8"))
+                                    for u in vault_data.get("users", []):
+                                        if (u.get("email") or "").strip().lower() == clean_reset_email:
+                                            restore_from_vault_payload(vault_data)
+                                            record = {"email": clean_reset_email}
+                                            break
+
                                 if record:
                                     code = str(random.randint(100000, 999999))
                                     st.session_state["forgot_code"] = code
@@ -1309,7 +1330,7 @@ st.session_state["last_activity_ts"] = now_ts
 if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
     st.session_state.role = "admin"
 
-user_role = st.session_state.get('role', 'user').strip().lower()
+user_role = st.session_state.get("role", "user").strip().lower()
 if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
     user_role = "admin"
 
@@ -1634,7 +1655,7 @@ with st.sidebar.expander("🛡️ Incident Response (SOAR)", expanded=False):
             )
             st.rerun()
 
-if user_role == 'admin':
+if user_role == "admin":
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🛠️ Operations & Reports")
 
@@ -1653,20 +1674,20 @@ if user_role == 'admin':
                 for recipient in recipient_emails:
                     try:
                         msg = MIMEMultipart()
-                        msg['From'] = sender_email
-                        msg['To'] = recipient
-                        msg['Subject'] = "[WARISAN SOC] Executive AI Threat Detection & Real-time Alert Report"
+                        msg["From"] = sender_email
+                        msg["To"] = recipient
+                        msg["Subject"] = "[WARISAN SOC] Executive AI Threat Detection & Real-time Alert Report"
 
                         body = "Attached is the latest automated executive threat intelligence report generated by Warisan AI-Based Threat Detection & Real-time Alert System."
-                        msg.attach(MIMEText(body, 'plain'))
+                        msg.attach(MIMEText(body, "plain"))
 
                         pdf_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), pdf_filename)
                         with open(pdf_path, "rb") as f:
                             attach = MIMEApplication(f.read(), Name=pdf_filename)
-                            attach['Content-Disposition'] = f'attachment; filename="{pdf_filename}"'
+                            attach["Content-Disposition"] = f'attachment; filename="{pdf_filename}"'
                             msg.attach(attach)
 
-                        server = smtplib.SMTP('smtp.gmail.com', 587)
+                        server = smtplib.SMTP("smtp.gmail.com", 587)
                         server.starttls()
                         server.login(sender_email, app_password)
                         server.sendmail(sender_email, recipient, msg.as_string())
@@ -1871,7 +1892,7 @@ with st.expander("🔬 Show Deep LSTM Layer Diagnostics & Neural Network Logs"):
 st.divider()
 
 # --- ADMIN-ONLY CLEARED IP RECORDS, VAULT BACKUP & REGISTERED USER ACCOUNTS ---
-if user_role == 'admin':
+if user_role == "admin":
     sync_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     st.caption(f"🔄 Live Admin Telemetry Synced: `{sync_ts}`")
 

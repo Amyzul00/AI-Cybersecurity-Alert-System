@@ -1,0 +1,29 @@
+[
+  {
+    "username": "WarisanAdmin",
+    "email": "warisansecurityalerts@gmail.com",
+    "role": "admin",
+    "password": "Warisan750715",
+    "login_count": 6,
+    "last_login": "2026-11-19 03:43:06",
+    "created_at": "2026-11-12 18:01:42"
+  },
+  {
+    "username": "Ameyzul",
+    "email": "ikmalmeyzul@gmail.com",
+    "role": "user",
+    "password": "Ameyzul123",
+    "login_count": 0,
+    "last_login": null,
+    "created_at": "2026-11-14 12:25:35"
+  },
+  {
+    "username": "zul",
+    "email": "sendermalwaree@gmail.com",
+    "role": "user",
+    "password": "zul123",
+    "login_count": 0,
+    "last_login": null,
+    "created_at": "2026-11-20 10:18:17"
+  }
+]
