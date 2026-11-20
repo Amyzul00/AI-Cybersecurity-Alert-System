@@ -637,6 +637,20 @@ def _save_active_sessions(data: dict) -> None:
         pass
 
 
+
+import hashlib as _hashlib
+if "SECRET_KEY" not in globals() or not SECRET_KEY:
+    _env_sec = (os.environ.get("WARISAN_JWT_SECRET") or os.environ.get("SECRET_KEY") or "").strip()
+    if not _env_sec:
+        try:
+            _env_sec = str(st.secrets.get("SECRET_KEY", "") or st.secrets.get("WARISAN_JWT_SECRET", "") or "").strip()
+        except Exception:
+            _env_sec = ""
+    if not _env_sec:
+        _seed = f"warisan-lstm-soar-session-key::{Path.cwd().resolve()}".encode("utf-8")
+        _env_sec = _hashlib.sha256(_seed).hexdigest()
+    SECRET_KEY = _env_sec
+
 def create_session_token(username: str, role: str, email: str, last_active: float) -> str:
     """Create a signed JWT token for refresh persistence (30-minute timeout)."""
     payload = {
@@ -797,7 +811,8 @@ elif url_token:
         st.session_state["last_activity_ts"] = now_check
         st.session_state["session_timeout_notice"] = ""
         persist_session_to_url(restored_user, restored_role, restored_email, now_check)
-    else:
+    elif decoded_url is None:
+        # Only clear malformed/tampered token; keep query param if still within window
         clear_session_from_url()
 
 if (st.session_state.get("email") or "").strip().lower() == "warisansecurityalerts@gmail.com":
