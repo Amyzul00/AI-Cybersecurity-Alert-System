@@ -582,27 +582,9 @@ def verify_websocket_token(token: str):
         return None
 
 
+import uuid
+
 ACTIVE_SESSIONS_FILE = Path("active_sessions.json")
-
-
-def _get_client_fingerprint() -> str:
-    """Build a stable client key so F5 reloads keep the session across Streamlit Cloud iframes."""
-    try:
-        cookies = dict(st.context.cookies) if hasattr(st, "context") and hasattr(st.context, "cookies") else {}
-        headers = dict(st.context.headers) if hasattr(st, "context") and hasattr(st.context, "headers") else {}
-        anon_id = (
-            cookies.get("ajs_anonymous_id")
-            or cookies.get("_streamlit_xsrf")
-            or cookies.get("streamlit_session")
-            or ""
-        )
-        ua = headers.get("User-Agent", headers.get("user-agent", "default-browser"))
-        raw_fp = f"{anon_id}|{ua}".strip()
-        if raw_fp and raw_fp != "|default-browser":
-            return raw_fp
-    except Exception:
-        pass
-    return "default-client-session"
 
 
 def _load_active_sessions() -> dict:
@@ -623,25 +605,46 @@ def _save_active_sessions(data: dict) -> None:
         pass
 
 
-def create_session_token(username: str, role: str, email: str, last_active: float) -> str:
+def _get_or_create_sid() -> str:
+    """Return a per-tab/window session ID from query params or session_state."""
+    try:
+        q_sid = st.query_params.get("sid")
+        if q_sid and isinstance(q_sid, str) and len(q_sid) >= 8:
+            st.session_state["tab_sid"] = q_sid
+            return q_sid
+    except Exception:
+        pass
+
+    if st.session_state.get("tab_sid"):
+        return st.session_state["tab_sid"]
+
+    new_sid = uuid.uuid4().hex[:16]
+    st.session_state["tab_sid"] = new_sid
+    return new_sid
+
+
+def create_session_token(username: str, role: str, email: str, last_active: float, sid: str = "") -> str:
     """Create a signed JWT session token that survives browser reloads for 30 minutes."""
     payload = {
         "sub": username,
         "role": role,
         "email": email,
+        "sid": sid,
         "last_active": float(last_active),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def persist_session_to_url(username: str, role: str, email: str, last_active: float) -> None:
-    token = create_session_token(username, role, email, last_active)
+    sid = _get_or_create_sid()
+    token = create_session_token(username, role, email, last_active, sid=sid)
     try:
+        st.query_params["sid"] = sid
         st.query_params["session"] = token
     except Exception:
         pass
     sessions = _load_active_sessions()
-    sessions[_get_client_fingerprint()] = {
+    sessions[sid] = {
         "token": token,
         "username": username,
         "role": role,
@@ -652,16 +655,26 @@ def persist_session_to_url(username: str, role: str, email: str, last_active: fl
 
 
 def clear_session_from_url() -> None:
+    sid = st.session_state.get("tab_sid") or ""
+    try:
+        q_sid = st.query_params.get("sid")
+        if q_sid:
+            sid = q_sid
+    except Exception:
+        pass
     try:
         if "session" in st.query_params:
             del st.query_params["session"]
+        if "sid" in st.query_params:
+            del st.query_params["sid"]
     except Exception:
         pass
-    sessions = _load_active_sessions()
-    fp = _get_client_fingerprint()
-    if fp in sessions:
-        del sessions[fp]
-        _save_active_sessions(sessions)
+    st.session_state.pop("tab_sid", None)
+    if sid:
+        sessions = _load_active_sessions()
+        if sid in sessions:
+            del sessions[sid]
+            _save_active_sessions(sessions)
 
 
 # --- GLOBAL SESSION STATE INITIALIZATION ---
@@ -704,17 +717,21 @@ if "forgot_email" not in st.session_state:
 if "forgot_code" not in st.session_state:
     st.session_state["forgot_code"] = ""
 
-# --- RESTORE ACTIVE SESSION ACROSS BROWSER REFRESH (UNTIL > 30 MINUTES INACTIVE) ---
+# --- RESTORE ACTIVE SESSION FOR THIS TAB/WINDOW ACROSS REFRESH (UNTIL > 30 MINUTES INACTIVE) ---
 if not st.session_state["logged_in"]:
     url_token = st.query_params.get("session")
-    if not url_token:
-        saved_sess = _load_active_sessions().get(_get_client_fingerprint())
+    q_sid = st.query_params.get("sid")
+    if not url_token and q_sid:
+        saved_sess = _load_active_sessions().get(q_sid)
         if isinstance(saved_sess, dict):
             url_token = saved_sess.get("token")
+            st.session_state["tab_sid"] = q_sid
     if url_token:
         decoded = verify_websocket_token(url_token)
         now_check = time.time()
         if decoded and (now_check - float(decoded.get("last_active", 0.0))) <= SESSION_TIMEOUT_SECONDS:
+            if decoded.get("sid"):
+                st.session_state["tab_sid"] = decoded["sid"]
             st.session_state["logged_in"] = True
             st.session_state["username"] = decoded["sub"]
             st.session_state["role"] = decoded["role"]
