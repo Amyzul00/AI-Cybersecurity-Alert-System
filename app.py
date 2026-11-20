@@ -1088,7 +1088,7 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=95.8, target_ip="
             </div>
 
             <div class="alert-card">
-                <div class="alert-header">? CRITICAL THREAT DETECTED</div>
+                <div class="alert-header">CRITICAL THREAT DETECTED</div>
                 <div class="alert-row">IP Address: &nbsp;<b>{target_ip}</b></div>
                 <div class="alert-row">Threat Type: &nbsp;<b>{threat_label}</b></div>
                 <div class="alert-row">Confidence: &nbsp;<b>{confidence_score:.1f}%</b></div>
@@ -1930,7 +1930,7 @@ with st.sidebar.expander("Alert Dispatch & Notification Center", expanded=False)
         for _, row in critical_alerts.iterrows():
             st.markdown(f"""
                 <div style="background-color: rgba(255, 75, 75, 0.12); border: 1px solid rgba(255, 75, 75, 0.35); border-radius: 6px; padding: 10px; margin-bottom: 8px;">
-                    <p style="margin: 0; color: #ff8080; font-size: 0.85rem; font-weight: 600;">? CRITICAL THREAT DETECTED</p>
+                    <p style="margin: 0; color: #ff8080; font-size: 0.85rem; font-weight: 600;">CRITICAL THREAT DETECTED</p>
                     <p style="margin: 4px 0 0 0; color: #f8fafc; font-size: 0.85rem;">IP: <b>{row['IP']}</b><br>Type: <b>{row['Threat']}</b><br>Confidence: <b>{row['Confidence']:.1f}%</b></p>
                 </div>
             """, unsafe_allow_html=True)
@@ -1942,7 +1942,7 @@ with st.sidebar.expander("Alert Dispatch & Notification Center", expanded=False)
         for _, row in warning_reminders.iterrows():
             st.markdown(f"""
                 <div style="background-color: rgba(251, 197, 49, 0.10); border: 1px solid rgba(251, 197, 49, 0.35); border-radius: 6px; padding: 8px; margin-bottom: 6px;">
-                    <p style="margin: 0; color: #fbc531; font-size: 0.82rem; font-weight: 600;">?? WARNING REMINDER</p>
+                    <p style="margin: 0; color: #fbc531; font-size: 0.82rem; font-weight: 600;">WARNING REMINDER</p>
                     <p style="margin: 3px 0 0 0; color: #e2e8f0; font-size: 0.82rem;">IP: <b>{row['IP']}</b> ({row['Threat']}) | Confidence: <b>{row['Confidence']:.1f}%</b></p>
                 </div>
             """, unsafe_allow_html=True)
