@@ -616,7 +616,7 @@ def create_session_token(username: str, role: str, email: str, last_active: floa
 
 
 def persist_session_to_url(username: str, role: str, email: str, last_active: float) -> None:
-    """Store only ONE active session on the website; logging in replaces any prior active account."""
+    """Store the single active session on the website (30-minute refresh persistence)."""
     token = create_session_token(username, role, email, last_active)
     try:
         st.query_params["session"] = token
@@ -634,15 +634,34 @@ def persist_session_to_url(username: str, role: str, email: str, last_active: fl
     _save_active_sessions(sessions)
 
 
-def get_singleton_session() -> dict | None:
+def get_active_single_account() -> dict | None:
+    """Return the currently active single session if still within the 30-minute window."""
     sess = _load_active_sessions().get(SINGLETON_SESSION_KEY)
-    return sess if isinstance(sess, dict) else None
+    if not isinstance(sess, dict):
+        return None
+    last_a = float(sess.get("last_active", 0.0))
+    if (time.time() - last_a) > SESSION_TIMEOUT_SECONDS:
+        clear_session_from_url()
+        return None
+    decoded = verify_websocket_token(sess.get("token", ""))
+    if not decoded:
+        clear_session_from_url()
+        return None
+    return {
+        "token": sess.get("token", ""),
+        "username": decoded["sub"],
+        "role": decoded["role"],
+        "email": decoded.get("email") or sess.get("email") or "",
+        "last_active": last_a,
+    }
 
 
 def clear_session_from_url() -> None:
     try:
         if "session" in st.query_params:
             del st.query_params["session"]
+        if "sid" in st.query_params:
+            del st.query_params["sid"]
     except Exception:
         pass
     sessions = _load_active_sessions()
@@ -691,66 +710,58 @@ if "forgot_email" not in st.session_state:
 if "forgot_code" not in st.session_state:
     st.session_state["forgot_code"] = ""
 
-# --- SINGLE-ACCOUNT SESSION SYNC & 30-MINUTE REFRESH PERSISTENCE ---
+# --- STRICT SINGLE-ACCOUNT SESSION & 30-MINUTE REFRESH PERSISTENCE ---
 now_check = time.time()
-active_singleton = get_singleton_session()
+active_acct = get_active_single_account()
+st.session_state["locked_by_other_account"] = None
 
-if st.session_state["logged_in"]:
-    # If another account took over the single active session, sign this session out
-    if not active_singleton:
+if active_acct:
+    active_email = (active_acct.get("email") or "").strip().lower()
+    active_user = (active_acct.get("username") or "").strip().lower()
+    cur_email = (st.session_state.get("email") or "").strip().lower()
+    cur_user = (st.session_state.get("username") or "").strip().lower()
+
+    same_account = (
+        (active_email and cur_email and active_email == cur_email)
+        or (not cur_email and active_user and cur_user and active_user == cur_user)
+    )
+
+    if not st.session_state["logged_in"] or same_account:
+        # Restore or keep this single active account across browser refresh
+        st.session_state["logged_in"] = True
+        st.session_state["username"] = active_acct["username"]
+        st.session_state["role"] = active_acct["role"]
+        st.session_state["email"] = active_acct["email"]
+        st.session_state["user_email"] = active_acct["email"]
+        st.session_state["last_activity_ts"] = now_check
+        st.session_state["session_timeout_notice"] = ""
+        persist_session_to_url(
+            st.session_state["username"],
+            st.session_state["role"],
+            st.session_state["email"] or "",
+            now_check,
+        )
+    else:
+        # Another browser/tab session tried to use a different account while 1 account is active
+        st.session_state["logged_in"] = False
+        st.session_state["username"] = ""
+        st.session_state["role"] = ""
+        st.session_state["email"] = None
+        st.session_state["user_email"] = None
+        st.session_state["otp_required"] = False
+        st.session_state["locked_by_other_account"] = active_acct["username"]
+else:
+    if st.session_state.get("logged_in"):
         st.session_state["logged_in"] = False
         st.session_state["username"] = ""
         st.session_state["role"] = ""
         st.session_state["email"] = None
         st.session_state["user_email"] = None
         st.session_state["last_activity_ts"] = None
-        clear_session_from_url()
-    else:
-        active_email = (active_singleton.get("email") or "").strip().lower()
-        active_user = (active_singleton.get("username") or "").strip().lower()
-        cur_email = (st.session_state.get("email") or "").strip().lower()
-        cur_user = (st.session_state.get("username") or "").strip().lower()
-        if (active_email and cur_email and active_email != cur_email) or (
-            not cur_email and active_user and cur_user and active_user != cur_user
-        ):
-            st.session_state["logged_in"] = False
-            st.session_state["username"] = ""
-            st.session_state["role"] = ""
-            st.session_state["email"] = None
-            st.session_state["user_email"] = None
-            st.session_state["last_activity_ts"] = None
-            st.session_state["session_timeout_notice"] = (
-                f"Another account ({active_singleton.get('username')}) is now the active session on this website."
-            )
-            try:
-                if "session" in st.query_params:
-                    del st.query_params["session"]
-            except Exception:
-                pass
-elif active_singleton:
-    # Restore the single active account across browser refresh if within 30 minutes
-    last_a = float(active_singleton.get("last_active", 0.0))
-    if (now_check - last_a) <= SESSION_TIMEOUT_SECONDS:
-        decoded = verify_websocket_token(active_singleton.get("token", ""))
-        if decoded:
-            st.session_state["logged_in"] = True
-            st.session_state["username"] = decoded["sub"]
-            st.session_state["role"] = decoded["role"]
-            st.session_state["email"] = decoded.get("email")
-            st.session_state["user_email"] = decoded.get("email")
-            st.session_state["last_activity_ts"] = now_check
-            st.session_state["session_timeout_notice"] = ""
-            persist_session_to_url(
-                st.session_state["username"],
-                st.session_state["role"],
-                st.session_state["email"] or "",
-                now_check,
-            )
-    else:
-        clear_session_from_url()
         st.session_state["session_timeout_notice"] = (
-            "?? Session expired after 30 minutes. You have been automatically signed out for security."
+            "?? Session expired after 30 minutes (or was signed out). Please sign in again."
         )
+    clear_session_from_url()
 
 if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
     st.session_state.role = "admin"
@@ -760,6 +771,14 @@ st.markdown('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs
 
 # --- HIDE TOP-RIGHT TOOLBAR BUTTONS & CONDITIONAL TOP PROGRESS BAR ---
 if not st.session_state["logged_in"]:
+    _holder = st.session_state.get("locked_by_other_account")
+    if _holder and get_active_single_account():
+        st.warning(
+            f"?? Only **1 account** can be signed in at a time on this website. "
+            f"**{_holder}** is currently signed in. Sign out from that session or wait until the 30-minute session expires before signing in with another account."
+        )
+        st.stop()
+
     st.markdown("""
         <style>
         [data-testid="stToolbar"] > div:not(:last-child) {
