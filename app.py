@@ -146,7 +146,7 @@ def clear_password_lockout(identifier: str) -> None:
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT username, email FROM users WHERE LOWER(TRIM(email)) = ? OR LOWER(TRIM(username)) = ?",
+                "SELECT username, email FROM users WHERE LOWER(TRIM(email)) = | OR LOWER(TRIM(username)) = ?",
                 (clean_id, clean_id),
             )
             for row in cursor.fetchall():
@@ -206,8 +206,7 @@ def record_login_to_db(email_or_user: str) -> None:
             """
             UPDATE users
             SET login_count = COALESCE(login_count, 0) + 1,
-                last_login = ?
-            WHERE LOWER(TRIM(email)) = LOWER(TRIM(?))
+                last_login = | WHERE LOWER(TRIM(email)) = LOWER(TRIM(?))
                OR LOWER(TRIM(username)) = LOWER(TRIM(?))
             """,
             (now_str, email_or_user, email_or_user),
@@ -355,18 +354,14 @@ def restore_from_vault_payload(vault_payload: dict) -> tuple[int, int]:
                     cursor.execute(
                         """
                         UPDATE users
-                        SET username = ?, password = ?, role = ?, login_count = ?, last_login = ?
-                        WHERE LOWER(TRIM(email)) = ?
-                        """,
+                        SET username = ?, password = ?, role = ?, login_count = ?, last_login = | WHERE LOWER(TRIM(email)) = | """,
                         (uname, upass, urole, lcount, llogin, uemail),
                     )
                 else:
                     cursor.execute(
                         """
                         UPDATE users
-                        SET username = ?, role = ?, login_count = ?, last_login = ?
-                        WHERE LOWER(TRIM(email)) = ?
-                        """,
+                        SET username = ?, role = ?, login_count = ?, last_login = | WHERE LOWER(TRIM(email)) = | """,
                         (uname, urole, lcount, llogin, uemail),
                     )
             else:
@@ -469,10 +464,10 @@ def get_linked_user_accounts_df() -> pd.DataFrame:
 # TEMPORAL VALIDITY LSTM & MODEL SPECIFICATION PANEL
 # =====================================================================
 def render_warisan_lstm_specs():
-    with st.expander("? Temporal Validity LSTM & Model Specification (DeepLSTM Architecture)", expanded=True):
+    with st.expander("Temporal Validity LSTM & Model Specification (DeepLSTM Architecture)", expanded=True):
         tab_temp, tab_spec = st.tabs([
-            "?? Temporal Validity (Sequence & Windowing)",
-            "? Model Specification & Architecture Table"
+            "Temporal Validity (Sequence & Windowing)",
+            "Model Specification & Architecture Table"
         ])
 
         with tab_temp:
@@ -1064,7 +1059,7 @@ def auto_send_lstm_threat_alert(threat_label, confidence_score=95.8, target_ip="
     SENDER_EMAIL = "warisansecurityalerts@gmail.com"
     SENDER_PASSWORD = "zjmm vunm ngec wkvu"
 
-    subject = f"? [WARISAN SOC] CRITICAL THREAT DETECTED: {threat_label}"
+    subject = f"[WARISAN SOC] CRITICAL THREAT DETECTED: {threat_label}"
     timestamp_str = my_now().strftime("%Y-%m-%d %H:%M:%S MYT")
 
     html_body = f"""
@@ -1150,7 +1145,7 @@ def send_soar_clear_notification(target_ip, threat_type, cleared_by):
     SENDER_EMAIL = "warisansecurityalerts@gmail.com"
     SENDER_PASSWORD = "zjmm vunm ngec wkvu"
 
-    subject = f"? [WARISAN SOC] THREAT RESOLVED & IP ISOLATED: {target_ip}"
+    subject = f"[WARISAN SOC] THREAT RESOLVED & IP ISOLATED: {target_ip}"
     timestamp_str = my_now().strftime("%Y-%m-%d %H:%M:%S MYT")
 
     html_body = f"""
@@ -1227,7 +1222,7 @@ def send_welcome_email(recipient_email, username):
     SENDER_EMAIL = "warisansecurityalerts@gmail.com"
     SENDER_PASSWORD = "zjmm vunm ngec wkvu"
 
-    subject = "?? [WARISAN SOC] Account Successfully Registered"
+    subject = "[WARISAN SOC] Account Successfully Registered"
 
     html_body = f"""
     <!DOCTYPE html>
@@ -1292,7 +1287,7 @@ def send_password_reset_email(recipient_email, reset_code):
     SENDER_EMAIL = "warisansecurityalerts@gmail.com"
     SENDER_PASSWORD = "zjmm vunm ngec wkvu"
 
-    subject = "? [WARISAN SOC] Password Reset Verification Code"
+    subject = "[WARISAN SOC] Password Reset Verification Code"
     body = f"""
     Hello,
 
@@ -1600,8 +1595,8 @@ if not st.session_state["logged_in"]:
                             st.warning("Please enter your email address.")
 
                 elif st.session_state["forgot_step"] == 2:
-                    st.info(f"? Verification code sent to: **{st.session_state['forgot_email']}**")
-                    st.warning(f"? **[DEBUG BYPASS] Reset Code:** `{st.session_state['forgot_code']}`")
+                    st.info(f"Verification code sent to: **{st.session_state['forgot_email']}**")
+                    st.warning(f"**[DEBUG BYPASS] Reset Code:** `{st.session_state['forgot_code']}`")
 
                     entered_reset_code = st.text_input("Enter 6-Digit Verification Code", key="entered_r_code")
                     new_password_input = st.text_input("Enter New Password", type="password", key="new_pword")
@@ -1639,7 +1634,7 @@ if not st.session_state["logged_in"]:
 
         st.markdown(f"""
             <div style="text-align: center; margin-top: 24px; font-size: 0.78rem; color: #64748b;">
-                {footer_logo_html} Warisan AI-Based Threat Detection & Real-time Alert System ? Secure 2FA Environment
+                {footer_logo_html} Warisan AI-Based Threat Detection & Real-time Alert System | Secure 2FA Environment
             </div>
         """, unsafe_allow_html=True)
 
@@ -1661,7 +1656,7 @@ if last_act is not None and (now_ts - float(last_act)) > SESSION_TIMEOUT_SECONDS
     st.session_state["last_activity_ts"] = None
     clear_session_from_url()
     st.session_state["session_timeout_notice"] = (
-        "?? Session expired after 30 minutes. You have been automatically signed out for security."
+        "Session expired after 30 minutes. You have been automatically signed out for security."
     )
     st.rerun()
 
@@ -1886,7 +1881,7 @@ with st.sidebar.expander("Identity & Session Governance", expanded=True):
             <p style="margin: 4px 0 0 0; color: #fbc531; font-size: 0.9rem;">? Role: <b>{st.session_state['role'].upper()}</b></p>
         </div>
     """, unsafe_allow_html=True)
-    if st.button("? Sign Out", use_container_width=True, key="sidebar_sign_out"):
+    if st.button("Sign Out", use_container_width=True, key="sidebar_sign_out"):
         st.session_state["logged_in"] = False
         st.session_state["username"] = ""
         st.session_state["role"] = ""
@@ -1902,7 +1897,7 @@ if st.sidebar.button("Synchronize & Rescan Telemetry", use_container_width=True,
     with st.spinner("Analyzing real-time network packets and refreshing data..."):
         time.sleep(1.2)
     st.toast("High-severity threat telemetry rescan completed successfully.", icon=":material/verified_user:")
-    st.toast("? Data refreshed & packet re-scan complete.", icon=":material/verified_user:")
+    st.toast("Data refreshed & packet re-scan complete.", icon=":material/verified_user:")
     st.rerun()
 
 st.sidebar.markdown("---")
@@ -1948,7 +1943,7 @@ with st.sidebar.expander("Alert Dispatch & Notification Center", expanded=False)
             st.markdown(f"""
                 <div style="background-color: rgba(251, 197, 49, 0.10); border: 1px solid rgba(251, 197, 49, 0.35); border-radius: 6px; padding: 8px; margin-bottom: 6px;">
                     <p style="margin: 0; color: #fbc531; font-size: 0.82rem; font-weight: 600;">?? WARNING REMINDER</p>
-                    <p style="margin: 3px 0 0 0; color: #e2e8f0; font-size: 0.82rem;">IP: <b>{row['IP']}</b> ({row['Threat']}) ? Confidence: <b>{row['Confidence']:.1f}%</b></p>
+                    <p style="margin: 3px 0 0 0; color: #e2e8f0; font-size: 0.82rem;">IP: <b>{row['IP']}</b> ({row['Threat']}) | Confidence: <b>{row['Confidence']:.1f}%</b></p>
                 </div>
             """, unsafe_allow_html=True)
 
@@ -1963,7 +1958,7 @@ with st.sidebar.expander("Telemetry Filtering & Analytics", expanded=True):
 with st.sidebar.expander("Live Packet Ingestion Stream", expanded=False):
     stream_live = st.toggle("Enable Live Packet Feed", value=False)
     if stream_live:
-        st.info("? Listening to active socket interface...")
+        st.info("Listening to active socket interface...")
         time.sleep(1.5)
         st.rerun()
 
@@ -1984,7 +1979,7 @@ with st.sidebar.expander("Automated Incident Response (SOAR)", expanded=False):
         if ip_status != "CRITICAL":
             st.session_state.clear_notice_type = "warning"
             st.session_state.clear_notice = (
-                f"?? Reminder: IP {target_ip} ({threat_cat}) is only a WARNING ? no critical isolation or alert email triggered."
+                f"Reminder: IP {target_ip} ({threat_cat}) is only a WARNING | no critical isolation or alert email triggered."
             )
             st.rerun()
         else:
@@ -2004,9 +1999,9 @@ with st.sidebar.expander("Automated Incident Response (SOAR)", expanded=False):
 
 if user_role == "admin":
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### ?? Operations & Reports")
+    st.sidebar.markdown("### | Operations & Reports")
 
-    if st.sidebar.button("? Email PDF Report to All Users", use_container_width=True):
+    if st.sidebar.button("Email PDF Report to All Users", use_container_width=True):
         try:
             recipient_emails = get_linked_recipient_emails()
 
@@ -2051,7 +2046,7 @@ if user_role == "admin":
 
     csv_data = filtered_df.to_csv(index=False).encode("utf-8")
     st.sidebar.download_button(
-        label="? Download CSV",
+        label="Download CSV",
         data=csv_data,
         file_name="warisan_threat_detection_report.csv",
         mime="text/csv",
@@ -2060,7 +2055,7 @@ if user_role == "admin":
 
     pdf_buffer = generate_pdf_report(filtered_df)
     st.sidebar.download_button(
-        label="? Download PDF Report",
+        label="Download PDF Report",
         data=pdf_buffer,
         file_name="executive_threat_report.pdf",
         mime="application/pdf",
@@ -2079,7 +2074,7 @@ st.divider()
 col_chart1, col_chart2 = st.columns(2)
 
 with col_chart1:
-    st.subheader("? Threat Classification Breakdown")
+    st.subheader("Threat Classification Breakdown")
     if not filtered_df.empty:
         threat_counts = filtered_df["Threat"].value_counts().reset_index()
         threat_counts.columns = ["Threat", "Count"]
@@ -2102,7 +2097,7 @@ with col_chart1:
         st.info("No threat data available for the selected filters.")
 
 with col_chart2:
-    st.subheader("? Threat Confidence Scores")
+    st.subheader("Threat Confidence Scores")
     if not filtered_df.empty:
         fig_bar = px.bar(
             filtered_df,
@@ -2124,7 +2119,7 @@ with col_chart2:
 
 st.divider()
 
-st.subheader("? Model Explainability & XAI (Explainable AI)")
+st.subheader("Model Explainability & XAI (Explainable AI)")
 st.caption("Gradient-based feature attribution displaying which packet attributes drove the LSTM threat classification.")
 
 xai_df = get_xai_feature_importances(st.session_state.get("live_data_nonce", 0))
@@ -2150,7 +2145,7 @@ with col_xai1:
     st.plotly_chart(fig_xai, use_container_width=True)
 
 with col_xai2:
-    st.markdown("### ? XAI Diagnostic Insights")
+    st.markdown("### | XAI Diagnostic Insights")
     st.info(
         "**Why did the AI flag this event?**\n\n"
         "The Deep LSTM model heavily weighed **Flow Bytes/s** (28.4%) "
@@ -2161,7 +2156,7 @@ with col_xai2:
 
 st.divider()
 
-st.subheader("? External Threat Intelligence & VirusTotal Lookup")
+st.subheader("External Threat Intelligence & VirusTotal Lookup")
 
 vt_ip_options = filtered_df["IP"].unique() if not filtered_df.empty else ["192.168.1.34"]
 selected_vt_ip = st.selectbox("Select Target IP for Threat Intelligence Inspection:", options=vt_ip_options, key="vt_ip_select")
@@ -2183,7 +2178,7 @@ geo_location = random.choice([
     "Enterprise Datacenter (Subnet Gateway)"
 ])
 
-with st.expander(f"? View VirusTotal / AbuseIPDB Reputation Report ({selected_vt_ip})", expanded=True):
+with st.expander(f"View VirusTotal / AbuseIPDB Reputation Report ({selected_vt_ip})", expanded=True):
     col_ti1, col_ti2 = st.columns(2)
     with col_ti1:
         st.write(f"**Target Analyzed IP:** `{selected_vt_ip}`")
@@ -2202,7 +2197,7 @@ with st.expander(f"? View VirusTotal / AbuseIPDB Reputation Report ({selected_vt
 st.divider()
 
 render_warisan_lstm_specs()
-st.subheader("? Real-Time Threat Event Log")
+st.subheader("Real-Time Threat Event Log")
 
 display_df = filtered_df.copy()
 display_df.index = range(1, len(display_df) + 1)
@@ -2224,7 +2219,7 @@ st.dataframe(
     },
 )
 
-with st.expander("? Show Deep LSTM Layer Diagnostics & Neural Network Logs"):
+with st.expander("Show Deep LSTM Layer Diagnostics & Neural Network Logs"):
     st.code(
         """[INFO] LSTM Input Shape: (Batch_Size=32, Time_Steps=100, Features=5)
 [INFO] Layer 1-2 (PyTorch Stacked DeepLSTM): Hidden_Units=64x2, Output Shape=(32, 64), Parameters=51,712
@@ -2252,9 +2247,9 @@ if user_role == "admin":
                     actor = info.get("cleared_by", "Unknown")
                     ts = info.get("timestamp", "")
                     ts_suffix = f" at `{ts}`" if ts else ""
-                    st.write(f"- `{ip}` ? Cleared via SOAR by **{actor}**{ts_suffix}")
+                    st.write(f"- `{ip}` | Cleared via SOAR by **{actor}**{ts_suffix}")
                 else:
-                    st.write(f"- `{ip}` ? Cleared via SOAR by **{info}**")
+                    st.write(f"- `{ip}` | Cleared via SOAR by **{info}**")
             if st.button("Restore Cleared Alerts", key="admin_restore_alerts_btn"):
                 clear_all_saved_ips()
                 st.session_state.cleared_ips = set()
@@ -2267,7 +2262,7 @@ if user_role == "admin":
     with st.expander("Administrative Data Persistence and Backup Vault", expanded=False):
         vault_snapshot = sync_admin_vault()
         st.write(
-            f"Latest Vault Snapshot: `{vault_snapshot.get('last_updated')}` ? "
+            f"Latest Vault Snapshot: `{vault_snapshot.get('last_updated')}` | "
             f"**{len(vault_snapshot.get('users', []))}** Registered User Accounts, "
             f"**{len(vault_snapshot.get('cleared_ips', {}))}** Cleared IP Records."
         )
@@ -2360,7 +2355,7 @@ if predicted_class.lower() != "normal":
             sent_count = auto_send_lstm_threat_alert(predicted_class, confidence)
 
             if sent_count > 0:
-                st.toast(f"? Threat alert auto-sent to {sent_count} user(s)!", icon=":material/verified_user:")
+                st.toast(f"Threat alert auto-sent to {sent_count} user(s)!", icon=":material/verified_user:")
                 st.session_state.last_alerted_threat = predicted_class
             else:
                 st.warning("Threat detected, but no valid user emails were found in the database.")
@@ -2371,6 +2366,6 @@ st.divider()
 
 st.markdown("""
     <div style="text-align: center; margin-top: 40px; padding: 20px 0; border-top: 1px solid #1f2937; color: #64748b; font-size: 0.85rem;">
-        Warisan AI-Based Threat Detection & Real-time Alert System ? Enterprise Threat Intelligence & Automated SOAR Framework
+        Warisan AI-Based Threat Detection & Real-time Alert System | Enterprise Threat Intelligence & Automated SOAR Framework
     </div>
 """, unsafe_allow_html=True)
