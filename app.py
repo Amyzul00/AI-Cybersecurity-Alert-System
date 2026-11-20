@@ -582,9 +582,8 @@ def verify_websocket_token(token: str):
         return None
 
 
-import uuid
-
 ACTIVE_SESSIONS_FILE = Path("active_sessions.json")
+SINGLETON_SESSION_KEY = "warisan_single_active_session"
 
 
 def _load_active_sessions() -> dict:
@@ -605,76 +604,51 @@ def _save_active_sessions(data: dict) -> None:
         pass
 
 
-def _get_or_create_sid() -> str:
-    """Return a per-tab/window session ID from query params or session_state."""
-    try:
-        q_sid = st.query_params.get("sid")
-        if q_sid and isinstance(q_sid, str) and len(q_sid) >= 8:
-            st.session_state["tab_sid"] = q_sid
-            return q_sid
-    except Exception:
-        pass
-
-    if st.session_state.get("tab_sid"):
-        return st.session_state["tab_sid"]
-
-    new_sid = uuid.uuid4().hex[:16]
-    st.session_state["tab_sid"] = new_sid
-    return new_sid
-
-
-def create_session_token(username: str, role: str, email: str, last_active: float, sid: str = "") -> str:
-    """Create a signed JWT session token that survives browser reloads for 30 minutes."""
+def create_session_token(username: str, role: str, email: str, last_active: float) -> str:
+    """Create a signed JWT token for the single active website session (30-minute timeout)."""
     payload = {
         "sub": username,
         "role": role,
         "email": email,
-        "sid": sid,
         "last_active": float(last_active),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def persist_session_to_url(username: str, role: str, email: str, last_active: float) -> None:
-    sid = _get_or_create_sid()
-    token = create_session_token(username, role, email, last_active, sid=sid)
+    """Store only ONE active session on the website; logging in replaces any prior active account."""
+    token = create_session_token(username, role, email, last_active)
     try:
-        st.query_params["sid"] = sid
         st.query_params["session"] = token
     except Exception:
         pass
-    sessions = _load_active_sessions()
-    sessions[sid] = {
-        "token": token,
-        "username": username,
-        "role": role,
-        "email": email,
-        "last_active": float(last_active),
+    sessions = {
+        SINGLETON_SESSION_KEY: {
+            "token": token,
+            "username": username,
+            "role": role,
+            "email": email,
+            "last_active": float(last_active),
+        }
     }
     _save_active_sessions(sessions)
 
 
+def get_singleton_session() -> dict | None:
+    sess = _load_active_sessions().get(SINGLETON_SESSION_KEY)
+    return sess if isinstance(sess, dict) else None
+
+
 def clear_session_from_url() -> None:
-    sid = st.session_state.get("tab_sid") or ""
-    try:
-        q_sid = st.query_params.get("sid")
-        if q_sid:
-            sid = q_sid
-    except Exception:
-        pass
     try:
         if "session" in st.query_params:
             del st.query_params["session"]
-        if "sid" in st.query_params:
-            del st.query_params["sid"]
     except Exception:
         pass
-    st.session_state.pop("tab_sid", None)
-    if sid:
-        sessions = _load_active_sessions()
-        if sid in sessions:
-            del sessions[sid]
-            _save_active_sessions(sessions)
+    sessions = _load_active_sessions()
+    if SINGLETON_SESSION_KEY in sessions:
+        del sessions[SINGLETON_SESSION_KEY]
+        _save_active_sessions(sessions)
 
 
 # --- GLOBAL SESSION STATE INITIALIZATION ---
@@ -717,21 +691,48 @@ if "forgot_email" not in st.session_state:
 if "forgot_code" not in st.session_state:
     st.session_state["forgot_code"] = ""
 
-# --- RESTORE ACTIVE SESSION FOR THIS TAB/WINDOW ACROSS REFRESH (UNTIL > 30 MINUTES INACTIVE) ---
-if not st.session_state["logged_in"]:
-    url_token = st.query_params.get("session")
-    q_sid = st.query_params.get("sid")
-    if not url_token and q_sid:
-        saved_sess = _load_active_sessions().get(q_sid)
-        if isinstance(saved_sess, dict):
-            url_token = saved_sess.get("token")
-            st.session_state["tab_sid"] = q_sid
-    if url_token:
-        decoded = verify_websocket_token(url_token)
-        now_check = time.time()
-        if decoded and (now_check - float(decoded.get("last_active", 0.0))) <= SESSION_TIMEOUT_SECONDS:
-            if decoded.get("sid"):
-                st.session_state["tab_sid"] = decoded["sid"]
+# --- SINGLE-ACCOUNT SESSION SYNC & 30-MINUTE REFRESH PERSISTENCE ---
+now_check = time.time()
+active_singleton = get_singleton_session()
+
+if st.session_state["logged_in"]:
+    # If another account took over the single active session, sign this session out
+    if not active_singleton:
+        st.session_state["logged_in"] = False
+        st.session_state["username"] = ""
+        st.session_state["role"] = ""
+        st.session_state["email"] = None
+        st.session_state["user_email"] = None
+        st.session_state["last_activity_ts"] = None
+        clear_session_from_url()
+    else:
+        active_email = (active_singleton.get("email") or "").strip().lower()
+        active_user = (active_singleton.get("username") or "").strip().lower()
+        cur_email = (st.session_state.get("email") or "").strip().lower()
+        cur_user = (st.session_state.get("username") or "").strip().lower()
+        if (active_email and cur_email and active_email != cur_email) or (
+            not cur_email and active_user and cur_user and active_user != cur_user
+        ):
+            st.session_state["logged_in"] = False
+            st.session_state["username"] = ""
+            st.session_state["role"] = ""
+            st.session_state["email"] = None
+            st.session_state["user_email"] = None
+            st.session_state["last_activity_ts"] = None
+            st.session_state["session_timeout_notice"] = (
+                f"Another account ({active_singleton.get('username')}) is now the active session on this website."
+            )
+            try:
+                if "session" in st.query_params:
+                    del st.query_params["session"]
+            except Exception:
+                pass
+elif active_singleton:
+    # Restore the single active account across browser refresh if within 30 minutes
+    last_a = float(active_singleton.get("last_active", 0.0))
+    if (now_check - last_a) <= SESSION_TIMEOUT_SECONDS:
+        decoded = verify_websocket_token(active_singleton.get("token", ""))
+        if decoded:
             st.session_state["logged_in"] = True
             st.session_state["username"] = decoded["sub"]
             st.session_state["role"] = decoded["role"]
@@ -745,12 +746,11 @@ if not st.session_state["logged_in"]:
                 st.session_state["email"] or "",
                 now_check,
             )
-        else:
-            clear_session_from_url()
-            if decoded:
-                st.session_state["session_timeout_notice"] = (
-                    "?? Session expired after 30 minutes. You have been automatically signed out for security."
-                )
+    else:
+        clear_session_from_url()
+        st.session_state["session_timeout_notice"] = (
+            "?? Session expired after 30 minutes. You have been automatically signed out for security."
+        )
 
 if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
     st.session_state.role = "admin"
