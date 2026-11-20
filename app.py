@@ -198,6 +198,94 @@ def sync_admin_vault() -> dict:
     return vault_payload
 
 
+def _ensure_users_table_columns(cursor) -> set:
+    """Inspect the SQLite users table columns and ensure login_count and last_login exist."""
+    cursor.execute("PRAGMA table_info(users)")
+    cols = {row["name"] if isinstance(row, dict) or hasattr(row, "keys") else row[1] for row in cursor.fetchall()}
+    if "login_count" not in cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN login_count INTEGER DEFAULT 0")
+        cols.add("login_count")
+    if "last_login" not in cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN last_login TEXT")
+        cols.add("last_login")
+    return cols
+
+
+def link_registered_account_to_db(username: str, email: str, password: str, role: str = "user") -> tuple[bool, str]:
+    """
+    Save every newly registered account into the SQLite users table (database.py),
+    guaranteeing column defaults and duplicate checks even if register_user() differs,
+    and immediately sync to the Admin Vault so it appears in user tables and email lists.
+    """
+    clean_user = (username or "").strip()
+    clean_email = (email or "").strip().lower()
+    clean_role = (role or "user").strip().lower()
+
+    if not clean_user or not clean_email or not password:
+        return False, "Missing required account fields."
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        _ensure_users_table_columns(cursor)
+
+        cursor.execute(
+            "SELECT id, username, email FROM users WHERE LOWER(TRIM(username)) = LOWER(?) OR LOWER(TRIM(email)) = LOWER(?)",
+            (clean_user, clean_email),
+        )
+        existing = cursor.fetchone()
+        if existing:
+            cursor.close()
+            conn.close()
+            return False, "This email address or username is already registered to another account."
+
+        created = False
+        try:
+            created = bool(register_user(clean_user, clean_email, password, clean_role))
+        except Exception:
+            created = False
+
+        # Re-check whether the row was actually inserted into SQLite
+        cursor.execute(
+            "SELECT id FROM users WHERE LOWER(TRIM(email)) = LOWER(?)",
+            (clean_email,),
+        )
+        inserted_row = cursor.fetchone()
+
+        if not inserted_row:
+            cursor.execute(
+                """
+                INSERT INTO users (username, password, role, email, login_count, last_login)
+                VALUES (?, ?, ?, ?, 0, NULL)
+                """,
+                (clean_user, password, clean_role, clean_email),
+            )
+            created = True
+        else:
+            cursor.execute(
+                """
+                UPDATE users
+                SET username = ?,
+                    role = ?,
+                    login_count = COALESCE(login_count, 0)
+                WHERE LOWER(TRIM(email)) = LOWER(?)
+                """,
+                (clean_user, clean_role, clean_email),
+            )
+            created = True
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        if created:
+            sync_admin_vault()
+            return True, "Account registered and linked to database."
+        return False, "Could not save account to database."
+    except Exception as e:
+        return False, f"Database error while registering account: {e}"
+
+
 def restore_from_vault_payload(vault_payload: dict) -> tuple[int, int]:
     """Restore cleared IPs and user accounts/login statistics from an Admin backup JSON."""
     restored_ips = 0
@@ -210,6 +298,7 @@ def restore_from_vault_payload(vault_payload: dict) -> tuple[int, int]:
     if isinstance(vault_payload.get("users"), list):
         conn = get_db_connection()
         cursor = conn.cursor()
+        _ensure_users_table_columns(cursor)
         for u in vault_payload["users"]:
             uname = (u.get("username") or "").strip()
             uemail = (u.get("email") or "").strip().lower()
@@ -245,6 +334,85 @@ def restore_from_vault_payload(vault_payload: dict) -> tuple[int, int]:
 
     sync_admin_vault()
     return restored_users, restored_ips
+
+
+def get_linked_recipient_emails() -> list[str]:
+    """Return a deduplicated list of all registered user emails from SQLite and Admin Vault."""
+    emails = set()
+    try:
+        db_emails = get_all_registered_users() or []
+        for e in db_emails:
+            if e and "@" in str(e):
+                emails.add(str(e).strip().lower())
+    except Exception:
+        pass
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT email FROM users WHERE email IS NOT NULL AND TRIM(email) != ''")
+        for row in cursor.fetchall():
+            val = row["email"] if hasattr(row, "keys") else row[0]
+            if val and "@" in str(val):
+                emails.add(str(val).strip().lower())
+        cursor.close()
+        conn.close()
+    except Exception:
+        pass
+    if ADMIN_VAULT_FILE.exists():
+        try:
+            vault_data = json.loads(ADMIN_VAULT_FILE.read_text(encoding="utf-8"))
+            for u in vault_data.get("users", []):
+                e = (u.get("email") or "").strip().lower()
+                if e and "@" in e:
+                    emails.add(e)
+        except Exception:
+            pass
+    return sorted(emails)
+
+
+def get_linked_user_accounts_df() -> pd.DataFrame:
+    """Fetch live registered user accounts and login statistics from SQLite (with vault fallback)."""
+    try:
+        df_users = get_all_user_accounts()
+        if df_users is not None and not df_users.empty:
+            return df_users
+    except Exception:
+        pass
+
+    records = []
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        _ensure_users_table_columns(cursor)
+        cursor.execute("SELECT username, email, role, login_count, last_login FROM users ORDER BY id ASC")
+        for r in cursor.fetchall():
+            records.append({
+                "Username": r["username"],
+                "Email": r["email"],
+                "Role": r["role"],
+                "Login Count": r["login_count"] if r["login_count"] is not None else 0,
+                "Last Login": r["last_login"],
+            })
+        cursor.close()
+        conn.close()
+    except Exception:
+        pass
+
+    if not records and ADMIN_VAULT_FILE.exists():
+        try:
+            vault_data = json.loads(ADMIN_VAULT_FILE.read_text(encoding="utf-8"))
+            for u in vault_data.get("users", []):
+                records.append({
+                    "Username": u.get("username"),
+                    "Email": u.get("email"),
+                    "Role": u.get("role"),
+                    "Login Count": u.get("login_count", 0),
+                    "Last Login": u.get("last_login"),
+                })
+        except Exception:
+            pass
+
+    return pd.DataFrame(records)
 
 
 # =====================================================================
@@ -344,6 +512,16 @@ def render_warisan_lstm_specs():
 
 # Initialize Database Schema & Auto-Restore from Admin Vault if present
 init_db()
+try:
+    _init_conn = get_db_connection()
+    _init_cur = _init_conn.cursor()
+    _ensure_users_table_columns(_init_cur)
+    _init_conn.commit()
+    _init_cur.close()
+    _init_conn.close()
+except Exception:
+    pass
+
 if ADMIN_VAULT_FILE.exists():
     try:
         saved_vault = json.loads(ADMIN_VAULT_FILE.read_text(encoding="utf-8"))
@@ -533,8 +711,7 @@ def verify_password(plain_password, stored_password):
 # AUTOMATED EMAIL & ALERT FUNCTIONS (GMAIL SAFE)
 # ==========================================
 def auto_send_lstm_threat_alert(threat_label, confidence_score=95.8, target_ip="192.168.1.96"):
-    recipient_emails = get_all_registered_users()
-    recipient_emails = list(set([e.lower().strip() for e in recipient_emails if e and "@" in e]))
+    recipient_emails = get_linked_recipient_emails()
 
     if not recipient_emails:
         return 0
@@ -620,8 +797,7 @@ def send_security_alert_to_all(src_ip, threat_type):
 
 
 def send_soar_clear_notification(target_ip, threat_type, cleared_by):
-    recipient_emails = get_all_registered_users()
-    recipient_emails = list(set([e.lower().strip() for e in recipient_emails if e and "@" in e]))
+    recipient_emails = get_linked_recipient_emails()
 
     if not recipient_emails:
         return 0
@@ -998,21 +1174,20 @@ if not st.session_state["logged_in"]:
                     cp_val = reg_confirm_pass or ""
                     if u_val and e_val and p_val and cp_val:
                         if p_val == cp_val:
-                            success = register_user(u_val, e_val, p_val, "user")
+                            success, status_msg = link_registered_account_to_db(u_val, e_val, p_val, "user")
                             if success:
-                                sync_admin_vault()
                                 with st.spinner("Sending confirmation email..."):
                                     email_sent = send_welcome_email(e_val, u_val)
 
                                 if email_sent:
-                                    st.success("Account successfully registered & confirmation email sent! Redirecting...")
+                                    st.success("Account successfully registered, linked to database & confirmation email sent! Redirecting...")
                                 else:
-                                    st.warning("Account registered in database, but confirmation email failed to send (check SMTP/firewall). Redirecting...")
+                                    st.warning("Account registered & linked to database, but confirmation email failed to send (check SMTP/firewall). Redirecting...")
                                 time.sleep(1.5)
                                 st.session_state["auth_view"] = "Login"
                                 st.rerun()
                             else:
-                                st.error("Registration failed. This email address or username is already registered to another account.")
+                                st.error(f"Registration failed. {status_msg}")
                         else:
                             st.error("Passwords do not match. Please re-enter.")
                     else:
@@ -1465,7 +1640,7 @@ if user_role == 'admin':
 
     if st.sidebar.button("📧 Email PDF Report to All Users", use_container_width=True):
         try:
-            recipient_emails = get_all_registered_users()
+            recipient_emails = get_linked_recipient_emails()
 
             if not recipient_emails:
                 st.warning("No registered user emails found in the database.")
@@ -1760,7 +1935,7 @@ if user_role == 'admin':
             sync_admin_vault()
             st.rerun()
 
-    fresh_users_df = get_all_user_accounts()
+    fresh_users_df = get_linked_user_accounts_df()
     if fresh_users_df is not None and not fresh_users_df.empty:
         st.dataframe(fresh_users_df, use_container_width=True)
     else:
