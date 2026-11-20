@@ -382,6 +382,41 @@ def get_all_user_accounts():
         conn.close()
 
 
+def delete_user_account(identifier: str) -> tuple[bool, str]:
+    """Delete a registered user account by email or username and sync users_backup.json."""
+    clean_id = (identifier or "").strip()
+    if not clean_id:
+        return False, "Please select or enter a valid account."
+
+    if clean_id.lower() == "warisansecurityalerts@gmail.com":
+        return False, "The primary admin account (warisansecurityalerts@gmail.com) cannot be deleted."
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "SELECT id, username, email, role FROM users WHERE LOWER(TRIM(email)) = LOWER(?) OR LOWER(TRIM(username)) = LOWER(?)",
+            (clean_id, clean_id),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return False, "Account not found in database."
+
+        if (row["email"] or "").strip().lower() == "warisansecurityalerts@gmail.com":
+            return False, "The primary admin account (warisansecurityalerts@gmail.com) cannot be deleted."
+
+        cursor.execute("DELETE FROM users WHERE id = ?", (row["id"],))
+        conn.commit()
+        _sync_users_backup(cursor)
+        conn.commit()
+        return True, f"Deleted account '{row['username']}' ({row['email']})."
+    except Exception as e:
+        return False, f"Failed to delete account: {e}"
+    finally:
+        cursor.close()
+        conn.close()
+
+
 def update_user_password(email: str, new_password: str) -> bool:
     """Update a user's password based on their email address."""
     conn = get_db_connection()

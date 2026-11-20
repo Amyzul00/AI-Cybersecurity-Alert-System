@@ -8,6 +8,7 @@ from database import (
     increment_user_login,
     get_all_user_accounts,
     update_user_password,
+    delete_user_account,
 )
 import threat_detector
 import base64
@@ -138,11 +139,43 @@ def record_failed_password(identifier: str) -> dict:
 
 
 def clear_password_lockout(identifier: str) -> None:
-    key = _lockout_key(identifier)
+    keys_to_clear = {_lockout_key(identifier)}
+    clean_id = (identifier or "").strip().lower()
+    if clean_id:
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT username, email FROM users WHERE LOWER(TRIM(email)) = ? OR LOWER(TRIM(username)) = ?",
+                (clean_id, clean_id),
+            )
+            for row in cursor.fetchall():
+                if row["username"]:
+                    keys_to_clear.add(str(row["username"]).strip().lower())
+                if row["email"]:
+                    keys_to_clear.add(str(row["email"]).strip().lower())
+            cursor.close()
+            conn.close()
+        except Exception:
+            pass
+        if ADMIN_VAULT_FILE.exists():
+            try:
+                v_data = json.loads(ADMIN_VAULT_FILE.read_text(encoding="utf-8"))
+                for u in v_data.get("users", []):
+                    u_em = (u.get("email") or "").strip().lower()
+                    u_un = (u.get("username") or "").strip().lower()
+                    if clean_id in (u_em, u_un):
+                        if u_em:
+                            keys_to_clear.add(u_em)
+                        if u_un:
+                            keys_to_clear.add(u_un)
+            except Exception:
+                pass
+
     lockouts = load_lockouts()
     removed = False
     for k in list(lockouts.keys()):
-        if k == key:
+        if k.strip().lower() in keys_to_clear:
             del lockouts[k]
             removed = True
     if removed:
@@ -2116,6 +2149,43 @@ if user_role == "admin":
         st.dataframe(fresh_users_df, use_container_width=True)
     else:
         st.info("No registered user accounts found in SQLite.")
+
+    st.markdown("#### ??? Delete Registered Account")
+    deletable_emails = []
+    if fresh_users_df is not None and not fresh_users_df.empty and "Email" in fresh_users_df.columns:
+        cur_admin_email = (st.session_state.get("email") or "").strip().lower()
+        for _, r_user in fresh_users_df.iterrows():
+            em = str(r_user.get("Email") or "").strip().lower()
+            un = str(r_user.get("Username") or "").strip()
+            rl = str(r_user.get("Role") or "").strip().lower()
+            if em and em != "warisansecurityalerts@gmail.com" and em != cur_admin_email and rl != "admin":
+                deletable_emails.append(f"{un} ({em})")
+
+    if deletable_emails:
+        selected_del = st.selectbox(
+            "Select User Account to Delete:",
+            options=deletable_emails,
+            key="admin_delete_account_select",
+        )
+        confirm_del = st.checkbox(
+            "Confirm permanent deletion of this account from SQLite and backup vault",
+            key="admin_confirm_delete_cb",
+        )
+        if st.button("??? Delete Selected Account", type="primary", key="admin_delete_account_btn"):
+            if not confirm_del:
+                st.warning("Please tick the confirmation checkbox before deleting an account.")
+            else:
+                target_email = selected_del.split("(")[-1].rstrip(")").strip()
+                ok_del, msg_del = delete_user_account(target_email)
+                if ok_del:
+                    sync_admin_vault()
+                    st.success(msg_del)
+                    time.sleep(0.8)
+                    st.rerun()
+                else:
+                    st.error(msg_del)
+    else:
+        st.caption("No non-admin user accounts available to delete.")
     st.divider()
 
 if "last_alerted_threat" not in st.session_state:
