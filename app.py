@@ -1701,7 +1701,7 @@ def load_detection_engine():
 
 
 if load_detection_engine():
-    st.success("? Successfully connected to backend threat engine, LSTM model, and SOAR framework.")
+    st.success("Operational: Connected to Threat Detection Engine, Deep LSTM Classifier, and SOAR Orchestrator.")
 
 
 @st.cache_data(ttl=5, show_spinner=False)
@@ -1879,7 +1879,7 @@ def generate_pdf_report(dataframe):
 if logo_base64:
     st.sidebar.markdown(f'<div style="text-align: center; margin-bottom: 12px;"><img src="{logo_base64}" style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid #ff4b4b; box-shadow: 0 0 12px rgba(255,75,75,0.6);"></div>', unsafe_allow_html=True)
 
-with st.sidebar.expander("? User Profile & Session", expanded=True):
+with st.sidebar.expander("Identity & Session Governance", expanded=True):
     st.markdown(f"""
         <div style="background-color: #0d2318; border: 1px solid #1e4630; border-radius: 8px; padding: 10px; margin-bottom: 10px;">
             <p style="margin: 0; color: #4cd137; font-size: 0.9rem;">? User: <b>{st.session_state['username']}</b></p>
@@ -1896,18 +1896,18 @@ with st.sidebar.expander("? User Profile & Session", expanded=True):
         clear_session_from_url()
         st.rerun()
 
-if st.sidebar.button("? Refresh & Rescan", use_container_width=True, key="sidebar_rescan_btn"):
+if st.sidebar.button("Synchronize & Rescan Telemetry", use_container_width=True, key="sidebar_rescan_btn"):
     st.cache_data.clear()
     st.session_state["live_data_nonce"] = st.session_state.get("live_data_nonce", 0) + 1
     with st.spinner("Analyzing real-time network packets and refreshing data..."):
         time.sleep(1.2)
-    st.toast("? High severity activity re-scanned successfully!", icon="??")
-    st.toast("? Data refreshed & packet re-scan complete.", icon="??")
+    st.toast("High-severity threat telemetry rescan completed successfully.", icon=":material/verified_user:")
+    st.toast("? Data refreshed & packet re-scan complete.", icon=":material/verified_user:")
     st.rerun()
 
 st.sidebar.markdown("---")
 
-with st.sidebar.expander("? Alert & Notification Center", expanded=False):
+with st.sidebar.expander("Alert Dispatch & Notification Center", expanded=False):
     st.session_state.cleared_ips = set(load_cleared_ips().keys())
     if st.session_state.get("clear_notice"):
         if st.session_state.get("clear_notice_type") == "warning":
@@ -1952,7 +1952,7 @@ with st.sidebar.expander("? Alert & Notification Center", expanded=False):
                 </div>
             """, unsafe_allow_html=True)
 
-with st.sidebar.expander("?? Filter & Analysis Controls", expanded=True):
+with st.sidebar.expander("Telemetry Filtering & Analytics", expanded=True):
     selected_threats = st.multiselect(
         "Select Threat Categories:",
         options=df["Threat"].unique() if not df.empty else [],
@@ -1960,14 +1960,14 @@ with st.sidebar.expander("?? Filter & Analysis Controls", expanded=True):
     )
     filtered_df = df[df["Threat"].isin(selected_threats)] if not df.empty else df
 
-with st.sidebar.expander("? Live Stream Telemetry", expanded=False):
+with st.sidebar.expander("Live Packet Ingestion Stream", expanded=False):
     stream_live = st.toggle("Enable Live Packet Feed", value=False)
     if stream_live:
         st.info("? Listening to active socket interface...")
         time.sleep(1.5)
         st.rerun()
 
-with st.sidebar.expander("?? Incident Response (SOAR)", expanded=False):
+with st.sidebar.expander("Automated Incident Response (SOAR)", expanded=False):
     target_ip = st.selectbox(
         "Select Host IP to Isolate:",
         options=filtered_df["IP"].unique() if not filtered_df.empty else ["N/A"],
@@ -2360,7 +2360,7 @@ if predicted_class.lower() != "normal":
             sent_count = auto_send_lstm_threat_alert(predicted_class, confidence)
 
             if sent_count > 0:
-                st.toast(f"? Threat alert auto-sent to {sent_count} user(s)!", icon="?")
+                st.toast(f"? Threat alert auto-sent to {sent_count} user(s)!", icon=":material/verified_user:")
                 st.session_state.last_alerted_threat = predicted_class
             else:
                 st.warning("Threat detected, but no valid user emails were found in the database.")
