@@ -1938,7 +1938,7 @@ with st.sidebar.expander("Alert Dispatch & Notification Center", expanded=False)
         st.caption("No active critical threat alerts.")
 
     if not warning_reminders.empty:
-        st.markdown("**?? Warning Reminders Only**")
+        st.markdown("**Warning Reminders Only**")
         for _, row in warning_reminders.iterrows():
             st.markdown(f"""
                 <div style="background-color: rgba(251, 197, 49, 0.10); border: 1px solid rgba(251, 197, 49, 0.35); border-radius: 6px; padding: 8px; margin-bottom: 6px;">
