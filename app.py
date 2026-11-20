@@ -606,7 +606,7 @@ return "default-client-session"
 
 
 def _load_active_sessions() -> dict:
-if ACTIVE_SESSIONS_FILE.exists():
+    if ACTIVE_SESSIONS_FILE.exists():
     try:
         data = json.loads(ACTIVE_SESSIONS_FILE.read_text(encoding="utf-8"))
         if isinstance(data, dict):
@@ -617,14 +617,14 @@ return {}
 
 
 def _save_active_sessions(data: dict) -> None:
-try:
+    try:
     ACTIVE_SESSIONS_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
 except Exception:
     pass
 
 
 def create_session_token(username: str, role: str, email: str, last_active: float) -> str:
-"""Create a signed JWT session token that survives browser reloads for 30 minutes."""
+    """Create a signed JWT session token that survives browser reloads for 30 minutes."""
 payload = {
     "sub": username,
     "role": role,
@@ -635,7 +635,7 @@ return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def persist_session_to_url(username: str, role: str, email: str, last_active: float) -> None:
-token = create_session_token(username, role, email, last_active)
+    token = create_session_token(username, role, email, last_active)
 try:
     st.query_params["session"] = token
 except Exception:
@@ -652,7 +652,7 @@ _save_active_sessions(sessions)
 
 
 def clear_session_from_url() -> None:
-try:
+    try:
     if "session" in st.query_params:
         del st.query_params["session"]
 except Exception:
