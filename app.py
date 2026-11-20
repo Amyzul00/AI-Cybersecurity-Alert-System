@@ -423,6 +423,89 @@ def send_security_alert_to_all(src_ip, threat_type):
     return auto_send_lstm_threat_alert(threat_type)
 
 
+def send_soar_clear_notification(target_ip, threat_type, cleared_by):
+    recipient_emails = get_all_registered_users()
+    recipient_emails = list(set([e.lower().strip() for e in recipient_emails if e and "@" in e]))
+
+    if not recipient_emails:
+        return 0
+
+    SENDER_EMAIL = "warisansecurityalerts@gmail.com"
+    SENDER_PASSWORD = "zjmm vunm ngec wkvu"
+
+    subject = f"✅ [WARISAN SOC] THREAT RESOLVED & IP ISOLATED: {target_ip}"
+    timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+
+    html_body = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            body {{ background-color: #f4f6f9; color: #333333; font-family: Arial, sans-serif; margin: 0; padding: 20px; }}
+            .email-container {{ max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; border: 1px solid #dcdde1; padding: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }}
+            .header {{ border-bottom: 2px solid #2ecc71; padding-bottom: 15px; margin-bottom: 20px; }}
+            .title {{ font-size: 1.25rem; font-weight: bold; color: #1e272e; margin: 0; }}
+            .subtitle {{ font-size: 0.8rem; color: #718093; margin: 4px 0 0 0; }}
+            .resolved-card {{ background-color: #f0fff4; border: 1px solid #9ae6b4; border-left: 5px solid #38a169; border-radius: 6px; padding: 16px; margin-bottom: 16px; }}
+            .resolved-header {{ color: #276749; font-size: 0.95rem; font-weight: bold; margin-bottom: 10px; }}
+            .resolved-row {{ font-size: 0.92rem; color: #2d3748; margin-bottom: 6px; }}
+            .description {{ font-size: 0.88rem; color: #4a5568; line-height: 1.5; margin-bottom: 20px; }}
+            .footer {{ margin-top: 25px; padding-top: 15px; border-top: 1px solid #edf2f7; font-size: 0.72rem; color: #a0aec0; text-align: center; }}
+        </style>
+    </head>
+    <body>
+        <div class="email-container">
+            <div class="header">
+                <h2 class="title">Warisan AI-Based Threat Detection & Real-time Alert System</h2>
+                <p class="subtitle">SOAR Automated Incident Containment & Resolution</p>
+            </div>
+
+            <div class="resolved-card">
+                <div class="resolved-header">✅ CRITICAL THREAT CLEARED & HOST ISOLATED</div>
+                <div class="resolved-row">Isolated IP Address: &nbsp;<b>{target_ip}</b></div>
+                <div class="resolved-row">Threat Category: &nbsp;<b>{threat_type}</b></div>
+                <div class="resolved-row">Action Executed By: &nbsp;<b>{cleared_by}</b></div>
+                <div class="resolved-row" style="margin-top: 8px; font-size: 0.8rem; color: #718093;">Timestamp: {timestamp_str}</div>
+            </div>
+
+            <div class="description">
+                The SOAR firewall rule has been pushed to isolate the malicious host and clear the active alert across all SOC dashboards.
+            </div>
+            <div class="footer">
+                Warisan AI-Based Threat Detection & Real-time Alert System Automated Notification Service<br>
+                This is a secure automated alert. Please do not reply directly to this email.
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    sent_count = 0
+    try:
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(SENDER_EMAIL, SENDER_PASSWORD)
+
+        for email in recipient_emails:
+            try:
+                msg = MIMEMultipart("alternative")
+                msg["From"] = SENDER_EMAIL
+                msg["To"] = email
+                msg["Subject"] = subject
+                msg.attach(MIMEText(html_body, "html"))
+
+                server.sendmail(SENDER_EMAIL, email, msg.as_string())
+                sent_count += 1
+            except Exception:
+                pass
+        server.quit()
+    except Exception:
+        pass
+
+    return sent_count
+
+
 def send_welcome_email(recipient_email, username):
     SENDER_EMAIL = "warisansecurityalerts@gmail.com"
     SENDER_PASSWORD = "zjmm vunm ngec wkvu"
@@ -1026,12 +1109,20 @@ with st.sidebar.expander("🛡️ Incident Response (SOAR)", expanded=False):
 
     if st.button("Block IP & Push Firewall Rule", type="primary", key="soar_block_ip_btn") and target_ip != "N/A":
         actor = st.session_state.get('username', 'Unknown')
-        with st.spinner(f"Pushing rule to iptables for {target_ip}..."):
-            time.sleep(1.0)
+        matched_rows = df[df["IP"] == target_ip] if not df.empty else pd.DataFrame()
+        threat_cat = matched_rows["Threat"].iloc[0] if not matched_rows.empty else "Detected Threat"
+
+        with st.spinner(f"Pushing rule to iptables for {target_ip} & notifying users..."):
+            time.sleep(0.8)
+            emailed_count = send_soar_clear_notification(target_ip, threat_cat, actor)
+
         handle_security_event(f"SOAR Action Executed: Host {target_ip} isolated and alert cleared (By: {actor})")
         save_cleared_ip(target_ip, actor)
         st.session_state.cleared_ips = set(load_cleared_ips().keys())
-        st.session_state.clear_notice = f"Successfully cleared & isolated {target_ip} (Action by: {actor})."
+        st.session_state.clear_notice = (
+            f"Successfully cleared & isolated {target_ip} (Action by: {actor}). "
+            f"Resolution email sent to {emailed_count} registered user(s)."
+        )
         st.rerun()
 
 if user_role == 'admin':
