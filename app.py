@@ -42,6 +42,7 @@ import streamlit as st
 
 CLEARED_IPS_FILE = Path("cleared_ips.json")
 LOCKOUT_FILE = Path("password_lockouts.json")
+ADMIN_VAULT_FILE = Path("admin_data_vault.json")
 MAX_PASSWORD_ATTEMPTS = 3
 LOCKOUT_DURATION_SECONDS = 300  # 5 minutes
 SESSION_TIMEOUT_SECONDS = 1800  # 30 minutes
@@ -60,13 +61,18 @@ def load_cleared_ips():
 
 def save_cleared_ip(ip, cleared_by):
     records = load_cleared_ips()
-    records[ip] = cleared_by
+    records[ip] = {
+        "cleared_by": cleared_by,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
     CLEARED_IPS_FILE.write_text(json.dumps(records, indent=2), encoding="utf-8")
+    sync_admin_vault()
 
 
 def clear_all_saved_ips():
     if CLEARED_IPS_FILE.exists():
         CLEARED_IPS_FILE.unlink()
+    sync_admin_vault()
 
 
 def _lockout_key(identifier: str) -> str:
@@ -128,6 +134,117 @@ def clear_password_lockout(identifier: str) -> None:
             removed = True
     if removed:
         save_lockouts(lockouts)
+
+
+def record_login_to_db(email_or_user: str) -> None:
+    """Ensure login_count and last_login are always updated in SQLite and synced to the Admin Vault."""
+    try:
+        increment_user_login(email_or_user)
+    except Exception:
+        pass
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute(
+            """
+            UPDATE users
+            SET login_count = COALESCE(login_count, 0) + 1,
+                last_login = ?
+            WHERE LOWER(TRIM(email)) = LOWER(TRIM(?))
+               OR LOWER(TRIM(username)) = LOWER(TRIM(?))
+            """,
+            (now_str, email_or_user, email_or_user),
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception:
+        pass
+    sync_admin_vault()
+
+
+def sync_admin_vault() -> dict:
+    """Keep a persistent JSON snapshot of all users, login stats, and cleared/isolated IPs."""
+    users_list = []
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT username, password, role, email, login_count, last_login FROM users")
+        rows = cursor.fetchall()
+        for r in rows:
+            users_list.append({
+                "username": r["username"],
+                "password": r["password"],
+                "role": r["role"],
+                "email": r["email"],
+                "login_count": r["login_count"] if r["login_count"] is not None else 0,
+                "last_login": r["last_login"],
+            })
+        cursor.close()
+        conn.close()
+    except Exception:
+        pass
+
+    vault_payload = {
+        "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "cleared_ips": load_cleared_ips(),
+        "users": users_list,
+    }
+    try:
+        ADMIN_VAULT_FILE.write_text(json.dumps(vault_payload, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+    return vault_payload
+
+
+def restore_from_vault_payload(vault_payload: dict) -> tuple[int, int]:
+    """Restore cleared IPs and user accounts/login statistics from an Admin backup JSON."""
+    restored_ips = 0
+    restored_users = 0
+
+    if isinstance(vault_payload.get("cleared_ips"), dict):
+        CLEARED_IPS_FILE.write_text(json.dumps(vault_payload["cleared_ips"], indent=2), encoding="utf-8")
+        restored_ips = len(vault_payload["cleared_ips"])
+
+    if isinstance(vault_payload.get("users"), list):
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        for u in vault_payload["users"]:
+            uname = (u.get("username") or "").strip()
+            uemail = (u.get("email") or "").strip().lower()
+            upass = u.get("password") or ""
+            urole = (u.get("role") or "user").strip().lower()
+            lcount = int(u.get("login_count") or 0)
+            llogin = u.get("last_login")
+            if not uname or not uemail:
+                continue
+            cursor.execute("SELECT id FROM users WHERE LOWER(TRIM(email)) = ?", (uemail,))
+            existing = cursor.fetchone()
+            if existing:
+                cursor.execute(
+                    """
+                    UPDATE users
+                    SET username = ?, role = ?, login_count = ?, last_login = ?
+                    WHERE LOWER(TRIM(email)) = ?
+                    """,
+                    (uname, urole, lcount, llogin, uemail),
+                )
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO users (username, password, role, email, login_count, last_login)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (uname, upass, urole, uemail, lcount, llogin),
+                )
+            restored_users += 1
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+    sync_admin_vault()
+    return restored_users, restored_ips
 
 
 # =====================================================================
@@ -225,8 +342,16 @@ def render_warisan_lstm_specs():
             st.dataframe(arch_df, use_container_width=True, hide_index=True)
 
 
-# Initialize Database Schema
+# Initialize Database Schema & Auto-Restore from Admin Vault if present
 init_db()
+if ADMIN_VAULT_FILE.exists():
+    try:
+        saved_vault = json.loads(ADMIN_VAULT_FILE.read_text(encoding="utf-8"))
+        restore_from_vault_payload(saved_vault)
+    except Exception:
+        pass
+else:
+    sync_admin_vault()
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
@@ -291,6 +416,8 @@ if "last_activity_ts" not in st.session_state:
     st.session_state["last_activity_ts"] = None
 if "session_timeout_notice" not in st.session_state:
     st.session_state["session_timeout_notice"] = ""
+if "live_data_nonce" not in st.session_state:
+    st.session_state["live_data_nonce"] = 0
 
 # Auth View Navigation State ("Login", "Register", "Forgot")
 if "auth_view" not in st.session_state:
@@ -728,7 +855,7 @@ if not st.session_state["logged_in"]:
                         if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
                             st.session_state.role = "admin"
 
-                        increment_user_login(st.session_state["temp_email"])
+                        record_login_to_db(st.session_state["temp_email"])
 
                         st.session_state["last_activity_ts"] = time.time()
                         st.session_state["session_timeout_notice"] = ""
@@ -873,6 +1000,7 @@ if not st.session_state["logged_in"]:
                         if p_val == cp_val:
                             success = register_user(u_val, e_val, p_val, "user")
                             if success:
+                                sync_admin_vault()
                                 with st.spinner("Sending confirmation email..."):
                                     email_sent = send_welcome_email(e_val, u_val)
 
@@ -952,6 +1080,7 @@ if not st.session_state["logged_in"]:
                                     updated = update_user_password(st.session_state["forgot_email"], new_password_input)
                                     if updated:
                                         clear_password_lockout(st.session_state["forgot_email"])
+                                        sync_admin_vault()
                                         st.success("Password successfully updated! Lockout cleared. Redirecting to Sign In...")
                                         st.session_state["forgot_step"] = 1
                                         st.session_state["forgot_email"] = ""
@@ -1033,8 +1162,8 @@ if load_detection_engine():
     st.success("✅ Successfully connected to backend threat engine, LSTM model, and SOAR framework.")
 
 
-@st.cache_data
-def get_backend_predictions():
+@st.cache_data(ttl=5, show_spinner=False)
+def get_backend_predictions(_refresh_nonce=0):
     formatted_data = []
     try:
         lstm_raw_results = threat_detector.run_lstm_inference() if hasattr(threat_detector, "run_lstm_inference") else []
@@ -1062,11 +1191,11 @@ def get_backend_predictions():
     return pd.DataFrame(formatted_data)
 
 
-df = get_backend_predictions()
+df = get_backend_predictions(st.session_state.get("live_data_nonce", 0))
 
 
-@st.cache_data
-def get_xai_feature_importances():
+@st.cache_data(ttl=5, show_spinner=False)
+def get_xai_feature_importances(_refresh_nonce=0):
     xai_data = {
         "Feature": [
             "Flow Bytes/s",
@@ -1226,6 +1355,7 @@ with st.sidebar.expander("👤 User Profile & Session", expanded=True):
 
 if st.sidebar.button("🔄 Refresh & Rescan", use_container_width=True, key="sidebar_rescan_btn"):
     st.cache_data.clear()
+    st.session_state["live_data_nonce"] = st.session_state.get("live_data_nonce", 0) + 1
     with st.spinner("Analyzing real-time network packets and refreshing data..."):
         time.sleep(1.2)
     st.toast("🚨 High severity activity re-scanned successfully!", icon="⚠️")
@@ -1454,7 +1584,7 @@ st.divider()
 st.subheader("🧠 Model Explainability & XAI (Explainable AI)")
 st.caption("Gradient-based feature attribution displaying which packet attributes drove the LSTM threat classification.")
 
-xai_df = get_xai_feature_importances()
+xai_df = get_xai_feature_importances(st.session_state.get("live_data_nonce", 0))
 col_xai1, col_xai2 = st.columns([3, 2])
 
 with col_xai1:
@@ -1565,14 +1695,23 @@ with st.expander("🔬 Show Deep LSTM Layer Diagnostics & Neural Network Logs"):
     )
 st.divider()
 
-# --- ADMIN-ONLY REGISTERED USER ACCOUNTS & LOGIN STATISTICS TABLE ---
+# --- ADMIN-ONLY CLEARED IP RECORDS, VAULT BACKUP & REGISTERED USER ACCOUNTS ---
 if user_role == 'admin':
+    sync_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    st.caption(f"🔄 Live Admin Telemetry Synced: `{sync_ts}`")
+
     cleared_records = load_cleared_ips()
-    with st.expander("Cleared / Isolated IP Records (Admin)", expanded=False):
+    with st.expander("Cleared / Isolated IP Records (Admin)", expanded=True):
         if cleared_records:
             st.success(f"{len(cleared_records)} IP alert(s) currently cleared and isolated across all users.")
-            for ip, actor in sorted(cleared_records.items()):
-                st.write(f"- `{ip}` — Cleared via SOAR by **{actor}**")
+            for ip, info in sorted(cleared_records.items()):
+                if isinstance(info, dict):
+                    actor = info.get("cleared_by", "Unknown")
+                    ts = info.get("timestamp", "")
+                    ts_suffix = f" at `{ts}`" if ts else ""
+                    st.write(f"- `{ip}` — Cleared via SOAR by **{actor}**{ts_suffix}")
+                else:
+                    st.write(f"- `{ip}` — Cleared via SOAR by **{info}**")
             if st.button("Restore Cleared Alerts", key="admin_restore_alerts_btn"):
                 clear_all_saved_ips()
                 st.session_state.cleared_ips = set()
@@ -1582,9 +1721,50 @@ if user_role == 'admin':
         else:
             st.caption("No IP alerts have been cleared yet.")
 
-    st.subheader("👥 Registered User Accounts & Login Statistics")
-    users_df = get_all_user_accounts()
-    st.dataframe(users_df, use_container_width=True)
+    with st.expander("💾 Admin Data Persistence & Backup Vault (Keep / Restore Data)", expanded=False):
+        vault_snapshot = sync_admin_vault()
+        st.write(
+            f"Last Vault Snapshot: `{vault_snapshot.get('last_updated')}` — "
+            f"**{len(vault_snapshot.get('users', []))}** user account(s), "
+            f"**{len(vault_snapshot.get('cleared_ips', {}))}** cleared IP record(s)."
+        )
+        st.download_button(
+            label="📥 Download Admin Data Backup (JSON)",
+            data=json.dumps(vault_snapshot, indent=2).encode("utf-8"),
+            file_name=f"warisan_admin_vault_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+        uploaded_vault = st.file_uploader(
+            "Restore Admin Data Backup (.json)",
+            type=["json"],
+            key="admin_vault_uploader",
+        )
+        if uploaded_vault is not None:
+            if st.button("Restore Uploaded Backup Now", key="admin_restore_vault_btn", type="primary"):
+                try:
+                    parsed_vault = json.loads(uploaded_vault.read().decode("utf-8"))
+                    u_restored, ip_restored = restore_from_vault_payload(parsed_vault)
+                    st.session_state.cleared_ips = set(load_cleared_ips().keys())
+                    st.success(f"Restored {u_restored} user account(s) and {ip_restored} cleared IP record(s)!")
+                    time.sleep(0.8)
+                    st.rerun()
+                except Exception as vault_err:
+                    st.error(f"Failed to restore backup: {vault_err}")
+
+    col_u1, col_u2 = st.columns([4, 1])
+    with col_u1:
+        st.subheader("👥 Registered User Accounts & Login Statistics")
+    with col_u2:
+        if st.button("Sync Users", key="admin_sync_users_btn", use_container_width=True):
+            sync_admin_vault()
+            st.rerun()
+
+    fresh_users_df = get_all_user_accounts()
+    if fresh_users_df is not None and not fresh_users_df.empty:
+        st.dataframe(fresh_users_df, use_container_width=True)
+    else:
+        st.info("No registered user accounts found in SQLite.")
     st.divider()
 
 if "last_alerted_threat" not in st.session_state:
