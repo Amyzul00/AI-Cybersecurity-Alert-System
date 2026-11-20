@@ -586,7 +586,7 @@ ACTIVE_SESSIONS_FILE = Path("active_sessions.json")
 
 
 def _get_client_fingerprint() -> str:
-"""Build a stable client key so F5 reloads keep the session across Streamlit Cloud iframes."""
+    """Build a stable client key so F5 reloads keep the session across Streamlit Cloud iframes."""
 try:
     cookies = dict(st.context.cookies) if hasattr(st, "context") and hasattr(st.context, "cookies") else {}
     headers = dict(st.context.headers) if hasattr(st, "context") and hasattr(st.context, "headers") else {}
