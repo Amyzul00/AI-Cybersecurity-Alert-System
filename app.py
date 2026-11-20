@@ -44,6 +44,7 @@ CLEARED_IPS_FILE = Path("cleared_ips.json")
 LOCKOUT_FILE = Path("password_lockouts.json")
 MAX_PASSWORD_ATTEMPTS = 3
 LOCKOUT_DURATION_SECONDS = 300  # 5 minutes
+SESSION_TIMEOUT_SECONDS = 1800  # 30 minutes
 
 
 def load_cleared_ips():
@@ -286,6 +287,10 @@ if "temp_email" not in st.session_state:
     st.session_state["temp_email"] = ""
 if "last_alerted_threat" not in st.session_state:
     st.session_state.last_alerted_threat = None
+if "last_activity_ts" not in st.session_state:
+    st.session_state["last_activity_ts"] = None
+if "session_timeout_notice" not in st.session_state:
+    st.session_state["session_timeout_notice"] = ""
 
 # Auth View Navigation State ("Login", "Register", "Forgot")
 if "auth_view" not in st.session_state:
@@ -675,6 +680,9 @@ def handle_security_event(message, is_critical=True):
     print(f"[SOAR] {message}")
 
 
+if st.session_state.get("session_timeout_notice") and not st.session_state["logged_in"]:
+    st.warning(st.session_state["session_timeout_notice"])
+
 # ==========================================
 # VIEW 1: MODERN SOC CARD AUTHENTICATION
 # ==========================================
@@ -722,6 +730,8 @@ if not st.session_state["logged_in"]:
 
                         increment_user_login(st.session_state["temp_email"])
 
+                        st.session_state["last_activity_ts"] = time.time()
+                        st.session_state["session_timeout_notice"] = ""
                         st.session_state["otp_required"] = False
                         st.session_state["generated_otp"] = ""
                         st.rerun()
@@ -975,6 +985,23 @@ if not st.session_state["logged_in"]:
 # ==========================================
 # VIEW 2: MAIN DASHBOARD
 # ==========================================
+now_ts = time.time()
+last_act = st.session_state.get("last_activity_ts")
+if last_act is not None and (now_ts - float(last_act)) > SESSION_TIMEOUT_SECONDS:
+    st.session_state["logged_in"] = False
+    st.session_state["username"] = ""
+    st.session_state["role"] = ""
+    st.session_state["email"] = None
+    st.session_state["user_email"] = None
+    st.session_state["otp_required"] = False
+    st.session_state["last_activity_ts"] = None
+    st.session_state["session_timeout_notice"] = (
+        "⏱️ Session expired after 30 minutes. You have been automatically signed out for security."
+    )
+    st.rerun()
+
+st.session_state["last_activity_ts"] = now_ts
+
 if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
     st.session_state.role = "admin"
 
@@ -1194,6 +1221,7 @@ with st.sidebar.expander("👤 User Profile & Session", expanded=True):
         st.session_state["role"] = ""
         st.session_state["email"] = None
         st.session_state["user_email"] = None
+        st.session_state["last_activity_ts"] = None
         st.rerun()
 
 if st.sidebar.button("🔄 Refresh & Rescan", use_container_width=True, key="sidebar_rescan_btn"):
