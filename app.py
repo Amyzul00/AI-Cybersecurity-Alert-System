@@ -41,6 +41,9 @@ from reportlab.platypus import (
 import streamlit as st
 
 CLEARED_IPS_FILE = Path("cleared_ips.json")
+LOCKOUT_FILE = Path("password_lockouts.json")
+MAX_PASSWORD_ATTEMPTS = 3
+LOCKOUT_DURATION_SECONDS = 300  # 5 minutes
 
 
 def load_cleared_ips():
@@ -63,6 +66,67 @@ def save_cleared_ip(ip, cleared_by):
 def clear_all_saved_ips():
     if CLEARED_IPS_FILE.exists():
         CLEARED_IPS_FILE.unlink()
+
+
+def _lockout_key(identifier: str) -> str:
+    return (identifier or "").strip().lower()
+
+
+def load_lockouts() -> dict:
+    if LOCKOUT_FILE.exists():
+        try:
+            data = json.loads(LOCKOUT_FILE.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+    return {}
+
+
+def save_lockouts(data: dict) -> None:
+    LOCKOUT_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def record_failed_password(identifier: str) -> dict:
+    key = _lockout_key(identifier)
+    lockouts = load_lockouts()
+    entry = lockouts.get(key, {"failed_attempts": 0, "locked_until": 0.0, "requires_reset": False})
+
+    now = time.time()
+    if entry.get("requires_reset") and now < float(entry.get("locked_until", 0.0)):
+        lockouts[key] = entry
+        save_lockouts(lockouts)
+        return entry
+
+    attempts = int(entry.get("failed_attempts", 0)) + 1
+    if attempts >= MAX_PASSWORD_ATTEMPTS:
+        entry = {
+            "failed_attempts": attempts,
+            "locked_until": now + LOCKOUT_DURATION_SECONDS,
+            "requires_reset": True,
+        }
+    else:
+        entry = {
+            "failed_attempts": attempts,
+            "locked_until": 0.0,
+            "requires_reset": False,
+        }
+
+    lockouts[key] = entry
+    save_lockouts(lockouts)
+    return entry
+
+
+def clear_password_lockout(identifier: str) -> None:
+    key = _lockout_key(identifier)
+    lockouts = load_lockouts()
+    removed = False
+    for k in list(lockouts.keys()):
+        if k == key:
+            del lockouts[k]
+            removed = True
+    if removed:
+        save_lockouts(lockouts)
 
 
 # =====================================================================
@@ -701,23 +765,82 @@ if not st.session_state["logged_in"]:
                         try:
                             conn = get_db_connection()
                             cursor = conn.cursor()
-                            cursor.execute("SELECT username, password, role, email FROM users WHERE username = ? OR email = ?", (u_login, u_login))
+                            cursor.execute(
+                                "SELECT username, password, role, email FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)",
+                                (u_login, u_login),
+                            )
                             user_record = cursor.fetchone()
                             cursor.close()
                             conn.close()
 
-                            if user_record and verify_password(p_login, user_record['password']):
-                                user_email = user_record['email'] if user_record['email'] else "warisansecurityalerts@gmail.com"
+                            lockouts = load_lockouts()
+                            canonical_email = (user_record["email"] or "").strip().lower() if user_record else ""
+                            canonical_user = (user_record["username"] or "").strip().lower() if user_record else ""
+                            active_entry = (
+                                lockouts.get(_lockout_key(u_login))
+                                or (lockouts.get(canonical_email) if canonical_email else None)
+                                or (lockouts.get(canonical_user) if canonical_user else None)
+                            )
+
+                            now = time.time()
+                            if active_entry and active_entry.get("requires_reset"):
+                                locked_until = float(active_entry.get("locked_until", 0.0))
+                                if now < locked_until:
+                                    remaining = int(locked_until - now)
+                                    mins, secs = divmod(remaining, 60)
+                                    st.error(
+                                        f"Too many failed password attempts (3/3). Account locked for 5 minutes. "
+                                        f"Please wait **{mins}m {secs:02d}s**, then reset your password."
+                                    )
+                                else:
+                                    st.error(
+                                        "The 5-minute lockout period has ended, but you must **reset your password** before signing in again."
+                                    )
+                                    if st.button("Reset Password Now", key="lockout_reset_btn", type="primary"):
+                                        st.session_state["auth_view"] = "Forgot"
+                                        st.session_state["forgot_step"] = 1
+                                        if canonical_email:
+                                            st.session_state["forgot_email"] = canonical_email
+                                        st.rerun()
+                                st.stop()
+
+                            if user_record and verify_password(p_login, user_record["password"]):
+                                clear_password_lockout(u_login)
+                                if canonical_email:
+                                    clear_password_lockout(canonical_email)
+                                if canonical_user:
+                                    clear_password_lockout(canonical_user)
+
+                                user_email = user_record["email"] if user_record["email"] else "warisansecurityalerts@gmail.com"
                                 otp_code = str(random.randint(100000, 999999))
 
                                 st.session_state["generated_otp"] = otp_code
-                                st.session_state["temp_username"] = user_record['username']
-                                st.session_state["temp_role"] = str(user_record['role']).upper()
+                                st.session_state["temp_username"] = user_record["username"]
+                                st.session_state["temp_role"] = str(user_record["role"]).upper()
                                 st.session_state["temp_email"] = user_email
                                 st.session_state["otp_required"] = True
                                 st.rerun()
                             else:
-                                st.error("Incorrect Username/Email or Password!")
+                                updated_entry = record_failed_password(u_login)
+                                if canonical_email and canonical_email != _lockout_key(u_login):
+                                    lockouts = load_lockouts()
+                                    lockouts[canonical_email] = updated_entry
+                                    save_lockouts(lockouts)
+                                if canonical_user and canonical_user != _lockout_key(u_login):
+                                    lockouts = load_lockouts()
+                                    lockouts[canonical_user] = updated_entry
+                                    save_lockouts(lockouts)
+
+                                if updated_entry.get("requires_reset"):
+                                    st.error(
+                                        "Incorrect password (3/3 failed attempts). Your account is now locked for **5 minutes**, "
+                                        "after which you must **reset your password** to log in."
+                                    )
+                                else:
+                                    attempts_left = MAX_PASSWORD_ATTEMPTS - int(updated_entry.get("failed_attempts", 0))
+                                    st.error(
+                                        f"Incorrect Username/Email or Password! ({attempts_left} attempt(s) remaining before a 5-minute lockout and mandatory password reset.)"
+                                    )
                         except Exception as e:
                             st.error(f"Database error: {e}")
                     else:
@@ -810,7 +933,8 @@ if not st.session_state["logged_in"]:
                                 if new_password_input == new_confirm_password_input:
                                     updated = update_user_password(st.session_state["forgot_email"], new_password_input)
                                     if updated:
-                                        st.success("Password successfully updated! Redirecting to Sign In...")
+                                        clear_password_lockout(st.session_state["forgot_email"])
+                                        st.success("Password successfully updated! Lockout cleared. Redirecting to Sign In...")
                                         st.session_state["forgot_step"] = 1
                                         st.session_state["forgot_email"] = ""
                                         st.session_state["forgot_code"] = ""
