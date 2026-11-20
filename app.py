@@ -766,7 +766,7 @@ if not st.session_state["logged_in"]:
                             conn = get_db_connection()
                             cursor = conn.cursor()
                             cursor.execute(
-                                "SELECT username, password, role, email FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)",
+                                "SELECT username, password, role, email FROM users WHERE LOWER(TRIM(username)) = LOWER(?) OR LOWER(TRIM(email)) = LOWER(?)",
                                 (u_login, u_login),
                             )
                             user_record = cursor.fetchone()
@@ -883,7 +883,12 @@ if not st.session_state["logged_in"]:
             elif st.session_state["auth_view"] == "Forgot":
                 if st.session_state["forgot_step"] == 1:
                     st.subheader("Account Recovery")
-                    reset_email_input = st.text_input("Enter your registered email address", key="reset_email")
+                    default_reset_email = st.session_state.get("forgot_email", "")
+                    reset_email_input = st.text_input(
+                        "Enter your registered email address",
+                        value=default_reset_email,
+                        key="reset_email",
+                    )
 
                     if st.button("Send Verification Code", use_container_width=True, type="primary"):
                         clean_reset_email = (reset_email_input or "").strip().lower()
@@ -891,7 +896,10 @@ if not st.session_state["logged_in"]:
                             try:
                                 conn = get_db_connection()
                                 cursor = conn.cursor()
-                                cursor.execute("SELECT email FROM users WHERE email = ?", (clean_reset_email,))
+                                cursor.execute(
+                                    "SELECT email FROM users WHERE LOWER(TRIM(email)) = ?",
+                                    (clean_reset_email,),
+                                )
                                 record = cursor.fetchone()
                                 cursor.close()
                                 conn.close()
