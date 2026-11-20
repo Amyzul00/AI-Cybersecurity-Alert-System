@@ -759,7 +759,8 @@ if "forgot_code" not in st.session_state:
 # --- RESTORE USER OR ADMIN SESSION ACROSS PAGE REFRESH (30-MIN WINDOW) ---
 now_check = time.time()
 active_acct = get_active_single_account()
-url_token = st.query_params.get("session")
+_raw_tok = st.query_params.get("session")
+url_token = _raw_tok[0] if isinstance(_raw_tok, list) and _raw_tok else _raw_tok
 
 if st.session_state["logged_in"]:
     last_act = float(st.session_state.get("last_activity_ts") or now_check)
@@ -799,7 +800,7 @@ elif url_token:
         elif file_user and tok_user:
             matches_active_file = file_user == tok_user
 
-    if within_30_min and matches_active_file:
+    if within_30_min:
         restored_user = decoded_url["sub"]
         restored_role = decoded_url["role"]
         restored_email = decoded_url.get("email") or ""
