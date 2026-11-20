@@ -1877,8 +1877,8 @@ if logo_base64:
 with st.sidebar.expander("Identity & Session Governance", expanded=True):
     st.markdown(f"""
         <div style="background-color: #0d2318; border: 1px solid #1e4630; border-radius: 8px; padding: 10px; margin-bottom: 10px;">
-            <p style="margin: 0; color: #4cd137; font-size: 0.9rem;">? User: <b>{st.session_state['username']}</b></p>
-            <p style="margin: 4px 0 0 0; color: #fbc531; font-size: 0.9rem;">? Role: <b>{st.session_state['role'].upper()}</b></p>
+            <p style="margin: 0; color: #4cd137; font-size: 0.9rem;">User: <b>{st.session_state['username']}</b></p>
+            <p style="margin: 4px 0 0 0; color: #fbc531; font-size: 0.9rem;">Role: <b>{st.session_state['role'].upper()}</b></p>
         </div>
     """, unsafe_allow_html=True)
     if st.button("Sign Out", use_container_width=True, key="sidebar_sign_out"):
