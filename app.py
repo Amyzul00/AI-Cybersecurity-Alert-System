@@ -1,4 +1,4 @@
-﻿from database import (
+from database import (
     get_db_connection,
     init_db,
     log_threat,
@@ -587,81 +587,83 @@ ACTIVE_SESSIONS_FILE = Path("active_sessions.json")
 
 def _get_client_fingerprint() -> str:
     """Build a stable client key so F5 reloads keep the session across Streamlit Cloud iframes."""
-try:
-    cookies = dict(st.context.cookies) if hasattr(st, "context") and hasattr(st.context, "cookies") else {}
-    headers = dict(st.context.headers) if hasattr(st, "context") and hasattr(st.context, "headers") else {}
-    anon_id = (
-        cookies.get("ajs_anonymous_id")
-        or cookies.get("_streamlit_xsrf")
-        or cookies.get("streamlit_session")
-        or ""
-    )
-    ua = headers.get("User-Agent", headers.get("user-agent", "default-browser"))
-    raw_fp = f"{anon_id}|{ua}".strip()
-    if raw_fp and raw_fp != "|default-browser":
-        return raw_fp
-except Exception:
-    pass
-return "default-client-session"
+    try:
+        cookies = dict(st.context.cookies) if hasattr(st, "context") and hasattr(st.context, "cookies") else {}
+        headers = dict(st.context.headers) if hasattr(st, "context") and hasattr(st.context, "headers") else {}
+        anon_id = (
+            cookies.get("ajs_anonymous_id")
+            or cookies.get("_streamlit_xsrf")
+            or cookies.get("streamlit_session")
+            or ""
+        )
+        ua = headers.get("User-Agent", headers.get("user-agent", "default-browser"))
+        raw_fp = f"{anon_id}|{ua}".strip()
+        if raw_fp and raw_fp != "|default-browser":
+            return raw_fp
+    except Exception:
+        pass
+    return "default-client-session"
 
 
 def _load_active_sessions() -> dict:
     if ACTIVE_SESSIONS_FILE.exists():
-    try:
-        data = json.loads(ACTIVE_SESSIONS_FILE.read_text(encoding="utf-8"))
-        if isinstance(data, dict):
-            return data
-    except Exception:
-        pass
-return {}
+        try:
+            data = json.loads(ACTIVE_SESSIONS_FILE.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+    return {}
 
 
 def _save_active_sessions(data: dict) -> None:
     try:
-    ACTIVE_SESSIONS_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
-except Exception:
-    pass
+        ACTIVE_SESSIONS_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    except Exception:
+        pass
 
 
 def create_session_token(username: str, role: str, email: str, last_active: float) -> str:
     """Create a signed JWT session token that survives browser reloads for 30 minutes."""
-payload = {
-    "sub": username,
-    "role": role,
-    "email": email,
-    "last_active": float(last_active),
-}
-return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    payload = {
+        "sub": username,
+        "role": role,
+        "email": email,
+        "last_active": float(last_active),
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def persist_session_to_url(username: str, role: str, email: str, last_active: float) -> None:
     token = create_session_token(username, role, email, last_active)
-try:
-    st.query_params["session"] = token
-except Exception:
-    pass
-sessions = _load_active_sessions()
-sessions[_get_client_fingerprint()] = {
-    "token": token,
-    "username": username,
-    "role": role,
-    "email": email,
-    "last_active": float(last_active),
-}
-_save_active_sessions(sessions)
+    try:
+        st.query_params["session"] = token
+    except Exception:
+        pass
+    sessions = _load_active_sessions()
+    sessions[_get_client_fingerprint()] = {
+        "token": token,
+        "username": username,
+        "role": role,
+        "email": email,
+        "last_active": float(last_active),
+    }
+    _save_active_sessions(sessions)
 
 
 def clear_session_from_url() -> None:
     try:
-    if "session" in st.query_params:
-        del st.query_params["session"]
-except Exception:
-    pass
-sessions = _load_active_sessions()
-fp = _get_client_fingerprint()
-if fp in sessions:
-    del sessions[fp]
-    _save_active_sessions(sessions)
+        if "session" in st.query_params:
+            del st.query_params["session"]
+    except Exception:
+        pass
+    sessions = _load_active_sessions()
+    fp = _get_client_fingerprint()
+    if fp in sessions:
+        del sessions[fp]
+        _save_active_sessions(sessions)
+
+
 # --- GLOBAL SESSION STATE INITIALIZATION ---
 if "user_email" not in st.session_state:
     st.session_state["user_email"] = None
@@ -704,34 +706,34 @@ if "forgot_code" not in st.session_state:
 
 # --- RESTORE ACTIVE SESSION ACROSS BROWSER REFRESH (UNTIL > 30 MINUTES INACTIVE) ---
 if not st.session_state["logged_in"]:
-url_token = st.query_params.get("session")
-if not url_token:
-    saved_sess = _load_active_sessions().get(_get_client_fingerprint())
-    if isinstance(saved_sess, dict):
-        url_token = saved_sess.get("token")
-if url_token:
-    decoded = verify_websocket_token(url_token)
-    now_check = time.time()
-    if decoded and (now_check - float(decoded.get("last_active", 0.0))) <= SESSION_TIMEOUT_SECONDS:
-        st.session_state["logged_in"] = True
-        st.session_state["username"] = decoded["sub"]
-        st.session_state["role"] = decoded["role"]
-        st.session_state["email"] = decoded.get("email")
-        st.session_state["user_email"] = decoded.get("email")
-        st.session_state["last_activity_ts"] = now_check
-        st.session_state["session_timeout_notice"] = ""
-        persist_session_to_url(
-            st.session_state["username"],
-            st.session_state["role"],
-            st.session_state["email"] or "",
-            now_check,
-        )
-    else:
-        clear_session_from_url()
-        if decoded:
-            st.session_state["session_timeout_notice"] = (
-                "?? Session expired after 30 minutes. You have been automatically signed out for security."
+    url_token = st.query_params.get("session")
+    if not url_token:
+        saved_sess = _load_active_sessions().get(_get_client_fingerprint())
+        if isinstance(saved_sess, dict):
+            url_token = saved_sess.get("token")
+    if url_token:
+        decoded = verify_websocket_token(url_token)
+        now_check = time.time()
+        if decoded and (now_check - float(decoded.get("last_active", 0.0))) <= SESSION_TIMEOUT_SECONDS:
+            st.session_state["logged_in"] = True
+            st.session_state["username"] = decoded["sub"]
+            st.session_state["role"] = decoded["role"]
+            st.session_state["email"] = decoded.get("email")
+            st.session_state["user_email"] = decoded.get("email")
+            st.session_state["last_activity_ts"] = now_check
+            st.session_state["session_timeout_notice"] = ""
+            persist_session_to_url(
+                st.session_state["username"],
+                st.session_state["role"],
+                st.session_state["email"] or "",
+                now_check,
             )
+        else:
+            clear_session_from_url()
+            if decoded:
+                st.session_state["session_timeout_notice"] = (
+                    "?? Session expired after 30 minutes. You have been automatically signed out for security."
+                )
 
 if st.session_state.get("email") == "warisansecurityalerts@gmail.com":
     st.session_state.role = "admin"
