@@ -693,6 +693,100 @@ def _record_user_login_stats(username: str = "", email: str = "") -> None:
             for item in obj:
                 _bump_record(item)
 
+LOGIN_STATS_FILE = Path("user_login_stats.json")
+
+
+def _now_myt_timestamp() -> str:
+    from datetime import datetime, timezone, timedelta
+    return (datetime.now(timezone.utc) + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M:%S MYT")
+
+
+def _load_login_stats_store() -> dict:
+    if LOGIN_STATS_FILE.exists():
+        try:
+            raw = json.loads(LOGIN_STATS_FILE.read_text(encoding="utf-8"))
+            if isinstance(raw, dict):
+                return raw
+        except Exception:
+            pass
+    return {}
+
+
+def _save_login_stats_store(store: dict) -> None:
+    try:
+        LOGIN_STATS_FILE.write_text(json.dumps(store, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _lookup_stats_entry(store: dict, username: str = "", email: str = "") -> dict | None:
+    candidates = [
+        (email or "").strip().lower(),
+        (username or "").strip().lower(),
+    ]
+    for k in candidates:
+        if k and isinstance(store.get(k), dict):
+            return store[k]
+    for val in store.values():
+        if isinstance(val, dict):
+            vu = str(val.get("username", "")).strip().lower()
+            ve = str(val.get("email", "")).strip().lower()
+            if (candidates[0] and ve == candidates[0]) or (candidates[1] and vu == candidates[1]):
+                return val
+    return None
+
+
+def _apply_stats_to_collection(store: dict) -> None:
+    for key in list(st.session_state.keys()):
+        obj = st.session_state.get(key)
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                if isinstance(v, dict) and ("role" in v or "email" in v or "login_count" in v):
+                    u_name = str(v.get("username") or v.get("user") or k or "")
+                    u_mail = str(v.get("email") or v.get("user_email") or "")
+                    entry = _lookup_stats_entry(store, u_name, u_mail)
+                    if entry:
+                        v["login_count"] = max(int(v.get("login_count") or 0), int(entry.get("login_count") or 0))
+                        if entry.get("last_login"):
+                            v["last_login"] = entry["last_login"]
+        elif isinstance(obj, list):
+            for item in obj:
+                if isinstance(item, dict) and ("role" in item or "email" in item or "login_count" in item):
+                    u_name = str(item.get("username") or item.get("user") or "")
+                    u_mail = str(item.get("email") or item.get("user_email") or "")
+                    entry = _lookup_stats_entry(store, u_name, u_mail)
+                    if entry:
+                        item["login_count"] = max(int(item.get("login_count") or 0), int(entry.get("login_count") or 0))
+                        if entry.get("last_login"):
+                            item["last_login"] = entry["last_login"]
+
+
+def record_and_save_login(username: str = "", email: str = "", increment: bool = True) -> dict:
+    """Persist login_count and last_login immediately and sync across session state."""
+    u_clean = (username or "").strip()
+    e_clean = (email or "").strip()
+    key = (e_clean or u_clean).lower()
+    if not key:
+        return {}
+
+    store = _load_login_stats_store()
+    existing = _lookup_stats_entry(store, u_clean, e_clean) or {}
+    count = int(existing.get("login_count") or 0)
+    if increment:
+        count += 1
+
+    updated_entry = {
+        "username": u_clean or existing.get("username", ""),
+        "email": e_clean or existing.get("email", ""),
+        "login_count": count,
+        "last_login": _now_myt_timestamp(),
+    }
+    store[key] = updated_entry
+    _save_login_stats_store(store)
+    _apply_stats_to_collection(store)
+    return updated_entry
+
+
 def create_session_token(username: str, role: str, email: str, last_active: float) -> str:
     """Create a signed JWT token for refresh persistence (30-minute timeout)."""
     payload = {
