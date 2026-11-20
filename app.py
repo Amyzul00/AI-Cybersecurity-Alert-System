@@ -2241,10 +2241,10 @@ st.divider()
 # --- ADMIN-ONLY CLEARED IP RECORDS, VAULT BACKUP & REGISTERED USER ACCOUNTS ---
 if user_role == "admin":
     sync_ts = my_now().strftime("%Y-%m-%d %H:%M:%S MYT")
-    st.caption(f"? Live Admin Telemetry Synced: `{sync_ts}`")
+    st.caption(f"Live Telemetry Synchronization Timestamp: `{sync_ts}`")
 
     cleared_records = load_cleared_ips()
-    with st.expander("Cleared / Isolated IP Records (Admin)", expanded=True):
+    with st.expander("Cleared and Isolated IP Records (Administrative Audit)", expanded=True):
         if cleared_records:
             st.success(f"{len(cleared_records)} IP alert(s) currently cleared and isolated across all users.")
             for ip, info in sorted(cleared_records.items()):
@@ -2262,24 +2262,24 @@ if user_role == "admin":
                 st.session_state.pop("clear_notice_type", None)
                 st.rerun()
         else:
-            st.caption("No IP alerts have been cleared yet.")
+            st.caption("No cleared or isolated IP records are currently on file.")
 
-    with st.expander("? Admin Data Persistence & Backup Vault (Keep / Restore Data)", expanded=False):
+    with st.expander("Administrative Data Persistence and Backup Vault", expanded=False):
         vault_snapshot = sync_admin_vault()
         st.write(
-            f"Last Vault Snapshot: `{vault_snapshot.get('last_updated')}` ? "
-            f"**{len(vault_snapshot.get('users', []))}** user account(s), "
-            f"**{len(vault_snapshot.get('cleared_ips', {}))}** cleared IP record(s)."
+            f"Latest Vault Snapshot: `{vault_snapshot.get('last_updated')}` ? "
+            f"**{len(vault_snapshot.get('users', []))}** Registered User Accounts, "
+            f"**{len(vault_snapshot.get('cleared_ips', {}))}** Cleared IP Records."
         )
         st.download_button(
-            label="? Download Admin Data Backup (JSON)",
+            label="Export Administrative Backup (JSON)",
             data=json.dumps(vault_snapshot, indent=2).encode("utf-8"),
             file_name=f"warisan_admin_vault_{my_now().strftime('%Y%m%d_%H%M%S')}.json",
             mime="application/json",
             use_container_width=True,
         )
         uploaded_vault = st.file_uploader(
-            "Restore Admin Data Backup (.json)",
+            "Import Administrative Backup (.json)",
             type=["json"],
             key="admin_vault_uploader",
         )
@@ -2289,7 +2289,7 @@ if user_role == "admin":
                     parsed_vault = json.loads(uploaded_vault.read().decode("utf-8"))
                     u_restored, ip_restored = restore_from_vault_payload(parsed_vault)
                     st.session_state.cleared_ips = set(load_cleared_ips().keys())
-                    st.success(f"Restored {u_restored} user account(s) and {ip_restored} cleared IP record(s)!")
+                    st.success(f"Restored {u_restored} Registered User Accounts and {ip_restored} Cleared IP Records!")
                     time.sleep(0.8)
                     st.rerun()
                 except Exception as vault_err:
@@ -2298,7 +2298,7 @@ if user_role == "admin":
     col_u1, col_u2 = st.columns([4, 1])
     with col_u1:
         _apply_stats_to_collection(_load_login_stats_store())
-        st.subheader("? Registered User Accounts & Login Statistics")
+        st.subheader("Registered User Accounts & Login Statistics")
     with col_u2:
         if st.button("Sync Users", key="admin_sync_users_btn", use_container_width=True):
             sync_admin_vault()
