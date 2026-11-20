@@ -695,16 +695,18 @@ if not st.session_state["logged_in"]:
 
                 st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
                 if st.button("Proceed to OTP Verification", use_container_width=True, type="primary"):
-                    if username_input and password:
+                    u_login = (username_input or "").strip()
+                    p_login = password or ""
+                    if u_login and p_login:
                         try:
                             conn = get_db_connection()
                             cursor = conn.cursor()
-                            cursor.execute("SELECT username, password, role, email FROM users WHERE username = ? OR email = ?", (username_input, username_input))
+                            cursor.execute("SELECT username, password, role, email FROM users WHERE username = ? OR email = ?", (u_login, u_login))
                             user_record = cursor.fetchone()
                             cursor.close()
                             conn.close()
 
-                            if user_record and verify_password(password, user_record['password']):
+                            if user_record and verify_password(p_login, user_record['password']):
                                 user_email = user_record['email'] if user_record['email'] else "warisansecurityalerts@gmail.com"
                                 otp_code = str(random.randint(100000, 999999))
 
@@ -730,12 +732,16 @@ if not st.session_state["logged_in"]:
 
                 st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
                 if st.button("Register Account", use_container_width=True, type="primary"):
-                    if reg_user and reg_email and reg_pass and reg_confirm_pass:
-                        if reg_pass == reg_confirm_pass:
-                            success = register_user(reg_user, reg_email, reg_pass, "user")
+                    u_val = (reg_user or "").strip()
+                    e_val = (reg_email or "").strip().lower()
+                    p_val = reg_pass or ""
+                    cp_val = reg_confirm_pass or ""
+                    if u_val and e_val and p_val and cp_val:
+                        if p_val == cp_val:
+                            success = register_user(u_val, e_val, p_val, "user")
                             if success:
                                 with st.spinner("Sending confirmation email..."):
-                                    email_sent = send_welcome_email(reg_email, reg_user)
+                                    email_sent = send_welcome_email(e_val, u_val)
 
                                 if email_sent:
                                     st.success("Account successfully registered & confirmation email sent! Redirecting...")
@@ -757,11 +763,12 @@ if not st.session_state["logged_in"]:
                     reset_email_input = st.text_input("Enter your registered email address", key="reset_email")
 
                     if st.button("Send Verification Code", use_container_width=True, type="primary"):
-                        if reset_email_input:
+                        clean_reset_email = (reset_email_input or "").strip().lower()
+                        if clean_reset_email:
                             try:
                                 conn = get_db_connection()
                                 cursor = conn.cursor()
-                                cursor.execute("SELECT email FROM users WHERE email = ?", (reset_email_input.strip().lower(),))
+                                cursor.execute("SELECT email FROM users WHERE email = ?", (clean_reset_email,))
                                 record = cursor.fetchone()
                                 cursor.close()
                                 conn.close()
@@ -769,7 +776,7 @@ if not st.session_state["logged_in"]:
                                 if record:
                                     code = str(random.randint(100000, 999999))
                                     st.session_state["forgot_code"] = code
-                                    st.session_state["forgot_email"] = reset_email_input.strip().lower()
+                                    st.session_state["forgot_email"] = clean_reset_email
 
                                     with st.spinner("Sending verification code to email..."):
                                         sent = send_password_reset_email(st.session_state["forgot_email"], code)
