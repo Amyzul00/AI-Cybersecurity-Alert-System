@@ -457,7 +457,7 @@ def get_linked_user_accounts_df() -> pd.DataFrame:
         except Exception:
             pass
 
-    return pd.DataFrame(records)
+    return pd.DataFrame(merge_login_stats_into_rows(records))
 
 
 # =====================================================================
@@ -936,6 +936,7 @@ elif url_token:
         restored_role = decoded_url["role"]
         restored_email = decoded_url.get("email") or ""
         st.session_state["logged_in"] = True
+        record_user_login(st.session_state.get("username", ""), st.session_state.get("email", ""))
         _record_user_login_stats(st.session_state.get("username") or st.session_state.get("temp_username") or "", st.session_state.get("email") or st.session_state.get("user_email") or st.session_state.get("temp_email") or "")
         st.session_state["username"] = restored_user
         st.session_state["role"] = restored_role
@@ -1725,7 +1726,7 @@ def get_backend_predictions(_refresh_nonce=0):
             {"IP": "192.168.1.210", "Status": "CRITICAL", "Threat": "DDoS", "Confidence": 96.0, "Acc": 97.5},
             {"IP": "192.168.1.5", "Status": "WARNING", "Threat": "PortScan", "Confidence": 85.5, "Acc": 90.0},
         ]
-    return pd.DataFrame(formatted_data)
+    return pd.DataFrame(merge_login_stats_into_rows(formatted_data))
 
 
 df = get_backend_predictions(st.session_state.get("live_data_nonce", 0))
@@ -1743,7 +1744,7 @@ def get_xai_feature_importances(_refresh_nonce=0):
         ],
         "Importance_Score": [28.4, 22.1, 18.5, 14.2, 10.3],
     }
-    return pd.DataFrame(xai_data)
+    return pd.DataFrame(merge_login_stats_into_rows(xai_data))
 
 
 # ==========================================
