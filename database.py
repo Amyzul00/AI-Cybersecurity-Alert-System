@@ -454,3 +454,77 @@ def update_user_password(email: str, new_password: str) -> bool:
 
 # Automatically initialize database schema on module import
 init_db()
+
+import json as _json
+from datetime import datetime as _datetime, timezone as _timezone
+
+_LOGIN_STATS_FILE = Path("user_login_stats.json")
+
+def _normalize_user_key(username: str = "", email: str = "") -> str:
+    u = (username or "").strip().lower()
+    e = (email or "").strip().lower()
+    return f"{u}|{e}" if (u or e) else ""
+
+def load_login_stats() -> dict:
+    if not _LOGIN_STATS_FILE.exists():
+        return {}
+    try:
+        raw = _json.loads(_LOGIN_STATS_FILE.read_text(encoding="utf-8"))
+        return raw if isinstance(raw, dict) else {}
+    except Exception:
+        return {}
+
+def save_login_stats(stats: dict) -> bool:
+    try:
+        _LOGIN_STATS_FILE.write_text(_json.dumps(stats, indent=2, sort_keys=True), encoding="utf-8")
+        return True
+    except Exception:
+        return False
+
+def record_user_login(username: str = "", email: str = "") -> dict:
+    stats = load_login_stats()
+    key = _normalize_user_key(username, email)
+    if not key:
+        return stats
+    now_str = _datetime.now(_timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    entry = stats.get(key, {"username": (username or "").strip(), "email": (email or "").strip(), "login_count": 0, "last_login": None})
+    entry["username"] = (username or entry.get("username") or "").strip()
+    entry["email"] = (email or entry.get("email") or "").strip()
+    entry["login_count"] = int(entry.get("login_count") or 0) + 1
+    entry["last_login"] = now_str
+    stats[key] = entry
+    save_login_stats(stats)
+    return stats
+
+def merge_login_stats_into_rows(rows) -> list:
+    stats = load_login_stats()
+    by_user = {}
+    by_email = {}
+    for v in stats.values():
+        if not isinstance(v, dict):
+            continue
+        uk = (v.get("username") or "").strip().lower()
+        ek = (v.get("email") or "").strip().lower()
+        if uk:
+            by_user[uk] = v
+        if ek:
+            by_email[ek] = v
+
+    merged = []
+    for r in (rows or []):
+        item = dict(r) if isinstance(r, dict) else {}
+        uk = str(item.get("Username") or item.get("username") or "").strip().lower()
+        ek = str(item.get("Email") or item.get("email") or "").strip().lower()
+        match = by_user.get(uk) or by_email.get(ek) or {}
+        db_count = int(item.get("Login Count") or item.get("login_count") or 0)
+        json_count = int(match.get("login_count") or 0)
+        final_count = max(db_count, json_count)
+        final_last = match.get("last_login") or item.get("Last Login") or item.get("last_login") or "None"
+        if "Login Count" in item or "Username" in item:
+            item["Login Count"] = final_count
+            item["Last Login"] = final_last if final_last else "None"
+        else:
+            item["login_count"] = final_count
+            item["last_login"] = final_last if final_last else "None"
+        merged.append(item)
+    return merged
