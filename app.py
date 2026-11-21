@@ -48,31 +48,115 @@ from pathlib import Path as _LoginPath
 
 _LOGIN_STATS_PATH = _LoginPath("user_login_stats.json")
 
-def record_user_login(username="", email=""):
-    u = (username or "").strip()
-    e = (email or "").strip()
-    key = f"{u.lower()}|{e.lower()}" if (u or e) else ""
+_LOGIN_STATS_PATH = _LoginPath("user_login_stats.json")
+_LOGIN_DB_PATH = _LoginPath("threat_logs.db")
+
+def _load_login_stats_map():
+    import sqlite3 as _login_sqlite
     stats = {}
     if _LOGIN_STATS_PATH.exists():
         try:
             loaded = _login_json.loads(_LOGIN_STATS_PATH.read_text(encoding="utf-8"))
             if isinstance(loaded, dict):
-                stats = loaded
+                stats.update(loaded)
         except Exception:
-            stats = {}
-    if not key:
-        return stats
-    row = stats.get(key, {"username": u, "email": e, "login_count": 0, "last_login": None})
-    row["username"] = u or row.get("username") or ""
-    row["email"] = e or row.get("email") or ""
-    row["login_count"] = int(row.get("login_count") or 0) + 1
-    row["last_login"] = _login_datetime.now(_login_timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-    stats[key] = row
+            pass
+    try:
+        conn = _login_sqlite.connect(str(_LOGIN_DB_PATH))
+        cur = conn.cursor()
+        cur.execute("CREATE TABLE IF NOT EXISTS user_login_stats (stat_key TEXT PRIMARY KEY, username TEXT, email TEXT, login_count INTEGER, last_login TEXT)")
+        for stat_key, u, e, cnt, last_login in cur.execute("SELECT stat_key, username, email, login_count, last_login FROM user_login_stats").fetchall():
+            k = str(stat_key or f"{str(u or '').strip().lower()}|{str(e or '').strip().lower()}")
+            prev = stats.get(k) if isinstance(stats.get(k), dict) else {}
+            best_cnt = max(int(prev.get("login_count") or 0), int(cnt or 0))
+            best_last = last_login or prev.get("last_login") or None
+            stats[k] = {
+                "username": u or prev.get("username") or "",
+                "email": e or prev.get("email") or "",
+                "login_count": best_cnt,
+                "last_login": best_last,
+            }
+        conn.close()
+    except Exception:
+        pass
+    return stats
+
+def _save_login_stats_map(stats):
+    import sqlite3 as _login_sqlite
+    if not isinstance(stats, dict):
+        return
     try:
         _LOGIN_STATS_PATH.write_text(_login_json.dumps(stats, indent=2, sort_keys=True), encoding="utf-8")
     except Exception:
         pass
+    try:
+        conn = _login_sqlite.connect(str(_LOGIN_DB_PATH))
+        cur = conn.cursor()
+        cur.execute("CREATE TABLE IF NOT EXISTS user_login_stats (stat_key TEXT PRIMARY KEY, username TEXT, email TEXT, login_count INTEGER, last_login TEXT)")
+        for k, v in stats.items():
+            if not isinstance(v, dict):
+                continue
+            u = str(v.get("username") or "").strip()
+            e = str(v.get("email") or "").strip()
+            sk = str(k or f"{u.lower()}|{e.lower()}")
+            cnt = int(v.get("login_count") or 0)
+            last = v.get("last_login")
+            cur.execute(
+                "INSERT INTO user_login_stats (stat_key, username, email, login_count, last_login) VALUES (?, ?, ?, ?, ?) "
+                "ON CONFLICT(stat_key) DO UPDATE SET username=excluded.username, email=excluded.email, login_count=MAX(user_login_stats.login_count, excluded.login_count), last_login=COALESCE(excluded.last_login, user_login_stats.last_login)",
+                (sk, u, e, cnt, last),
+            )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+def record_user_login(username="", email=""):
+    u = (username or "").strip()
+    e = (email or "").strip()
+    stats = _load_login_stats_map()
+    key = f"{u.lower()}|{e.lower()}" if (u or e) else ""
+    if not key:
+        return stats
+    # Match existing entry by username or email even if the other field was blank
+    matched_key = key
+    for ek, ev in stats.items():
+        if not isinstance(ev, dict):
+            continue
+        eu = str(ev.get("username") or "").strip().lower()
+        ee = str(ev.get("email") or "").strip().lower()
+        if (u and eu == u.lower()) or (e and ee == e.lower()):
+            matched_key = ek
+            break
+    row = dict(stats.get(matched_key) or {"username": u, "email": e, "login_count": 0, "last_login": None})
+    row["username"] = u or row.get("username") or ""
+    row["email"] = e or row.get("email") or ""
+    row["login_count"] = int(row.get("login_count") or 0) + 1
+    row["last_login"] = _login_datetime.now(_login_timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    stats[matched_key] = row
+    _save_login_stats_map(stats)
     return stats
+
+def merge_login_stats_into_rows(rows):
+    stats = _load_login_stats_map()
+    by_u = {str(v.get("username") or "").strip().lower(): v for v in stats.values() if isinstance(v, dict) and v.get("username")}
+    by_e = {str(v.get("email") or "").strip().lower(): v for v in stats.values() if isinstance(v, dict) and v.get("email")}
+    out = []
+    for r in (rows or []):
+        item = dict(r) if isinstance(r, dict) else {}
+        uk = str(item.get("Username") or item.get("username") or "").strip().lower()
+        ek = str(item.get("Email") or item.get("email") or "").strip().lower()
+        m = by_u.get(uk) or by_e.get(ek) or {}
+        cnt = max(int(item.get("Login Count") or item.get("login_count") or 0), int(m.get("login_count") or 0))
+        last = m.get("last_login") or item.get("Last Login") or item.get("last_login") or "None"
+        if "Login Count" in item or "Username" in item:
+            item["Login Count"] = cnt
+            item["Last Login"] = last or "None"
+        elif "login_count" in item or "username" in item:
+            item["login_count"] = cnt
+            item["last_login"] = last or "None"
+        out.append(item)
+    return out
 
 def merge_login_stats_into_rows(rows):
     stats = {}
