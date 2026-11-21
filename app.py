@@ -42,6 +42,67 @@ from reportlab.platypus import (
 )
 import streamlit as st
 
+import json as _login_json
+from datetime import datetime as _login_datetime, timezone as _login_timezone
+from pathlib import Path as _LoginPath
+
+_LOGIN_STATS_PATH = _LoginPath("user_login_stats.json")
+
+def record_user_login(username="", email=""):
+    u = (username or "").strip()
+    e = (email or "").strip()
+    key = f"{u.lower()}|{e.lower()}" if (u or e) else ""
+    stats = {}
+    if _LOGIN_STATS_PATH.exists():
+        try:
+            loaded = _login_json.loads(_LOGIN_STATS_PATH.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                stats = loaded
+        except Exception:
+            stats = {}
+    if not key:
+        return stats
+    row = stats.get(key, {"username": u, "email": e, "login_count": 0, "last_login": None})
+    row["username"] = u or row.get("username") or ""
+    row["email"] = e or row.get("email") or ""
+    row["login_count"] = int(row.get("login_count") or 0) + 1
+    row["last_login"] = _login_datetime.now(_login_timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    stats[key] = row
+    try:
+        _LOGIN_STATS_PATH.write_text(_login_json.dumps(stats, indent=2, sort_keys=True), encoding="utf-8")
+    except Exception:
+        pass
+    return stats
+
+def merge_login_stats_into_rows(rows):
+    stats = {}
+    if _LOGIN_STATS_PATH.exists():
+        try:
+            loaded = _login_json.loads(_LOGIN_STATS_PATH.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                stats = loaded
+        except Exception:
+            stats = {}
+    by_u = {str(v.get("username") or "").strip().lower(): v for v in stats.values() if isinstance(v, dict) and v.get("username")}
+    by_e = {str(v.get("email") or "").strip().lower(): v for v in stats.values() if isinstance(v, dict) and v.get("email")}
+    out = []
+    for r in (rows or []):
+        item = dict(r) if isinstance(r, dict) else {}
+        uk = str(item.get("Username") or item.get("username") or "").strip().lower()
+        ek = str(item.get("Email") or item.get("email") or "").strip().lower()
+        m = by_u.get(uk) or by_e.get(ek) or {}
+        cnt = max(int(item.get("Login Count") or item.get("login_count") or 0), int(m.get("login_count") or 0))
+        last = m.get("last_login") or item.get("Last Login") or item.get("last_login") or "None"
+        if "Login Count" in item or "Username" in item:
+            item["Login Count"] = cnt
+            item["Last Login"] = last or "None"
+        elif "login_count" in item or "username" in item:
+            item["login_count"] = cnt
+            item["last_login"] = last or "None"
+        out.append(item)
+    return out
+
+
 try:
     MY_TZ = ZoneInfo("Asia/Kuala_Lumpur")
 except Exception:
